@@ -1,0 +1,88 @@
+using System;
+using System.Configuration;
+using System.IO;
+using System.Web.UI;
+using EducationApp.Utils;
+
+namespace EducationApp
+{
+    public partial class SiteMaster : MasterPage
+    {
+        public bool IsUserAdmin
+        {
+            get { return UserSession.IsAdmin; }
+        }
+
+        public string CurrentUserRole
+        {
+            get { return UserSession.Role; }
+        }
+
+        public string CurrentPCNO
+        {
+            get { return UserSession.CurrentPCNO ?? "---"; }
+        }
+
+        protected void Page_Load(object sender, EventArgs e)
+        {
+            if (!UserSession.IsAuthenticated)
+            {
+                Response.Redirect("Login.aspx");
+                return;
+            }
+
+            if (!IsPostBack)
+            {
+                string pcno = UserSession.CurrentPCNO ?? "---";
+                litNavPCNO.Text = pcno;
+                litNavUserName.Text = UserSession.CurrentUserName ?? pcno;
+
+                if (imgNavAvatar != null)
+                {
+                    imgNavAvatar.ImageUrl = "Static/Images/default_avatar.png";
+                    imgNavAvatar.Attributes["onerror"] = "this.onerror=null; this.src='Static/Images/default_avatar.png';";
+
+                    bool enableIntranetPhotos = string.Equals(ConfigurationManager.AppSettings["EnableIntranetPhotos"], "true", StringComparison.OrdinalIgnoreCase);
+                    if (enableIntranetPhotos && !string.IsNullOrEmpty(pcno) && pcno != "---")
+                    {
+                        imgNavAvatar.Attributes["data-intranet-photo"] = string.Format("http://windflower.lrde.com/empphotos/Dsc_{0}.jpg", pcno);
+                    }
+                    else
+                    {
+                        imgNavAvatar.Attributes.Remove("data-intranet-photo");
+                    }
+                }
+
+                if (litNavRoleBadge != null)
+                {
+                    string badgeClass = UserSession.IsAdmin ? "badge-warning" : "badge-info";
+                    litNavRoleBadge.Text = string.Format("<span class=\"badge badge-pill {0} ml-1\">{1}</span>", badgeClass, System.Web.HttpUtility.HtmlEncode(UserSession.Role ?? "User"));
+                }
+
+                phAdminNav.Visible = UserSession.IsAdmin;
+            }
+        }
+
+        public string GetActiveNav(string pageName)
+        {
+            string currentPage = Path.GetFileName(Request.Path);
+            return string.Equals(currentPage, pageName, StringComparison.OrdinalIgnoreCase) ? "active" : "";
+        }
+
+        public void ShowAlert(string message, string type = "success")
+        {
+            ShowToast(message, type, 3000);
+        }
+
+        public void ShowToast(string message, string type = "info", int durationMs = 3000)
+        {
+            pnlGlobalAlert.Visible = false;
+            string cleanMsg = System.Web.HttpUtility.JavaScriptStringEncode(message, false);
+            string script = string.Format(
+                "(function(){{function r(){{if(window.EduApp&&EduApp.showToast){{EduApp.showToast('{0}','{1}',{2});}}else{{setTimeout(r,50);}}}}if(document.readyState==='loading'){{document.addEventListener('DOMContentLoaded',r);}}else{{r();}}}})();",
+                cleanMsg, type, durationMs
+            );
+            Page.ClientScript.RegisterStartupScript(Page.GetType(), "Toast_" + Guid.NewGuid().ToString("N"), script, true);
+        }
+    }
+}

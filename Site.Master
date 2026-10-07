@@ -1,0 +1,165 @@
+<%@ Master Language="C#" AutoEventWireup="true" CodeBehind="Site.master.cs" Inherits="EducationApp.SiteMaster" %>
+<%@ Import Namespace="EducationApp.Utils" %>
+
+<!DOCTYPE html>
+<html lang="en">
+<head runat="server">
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title><%: Page.Title %> - Employee Education Portal</title>
+
+    <!-- Local Offline CSS Assets -->
+    <link href="Static/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css" />
+    <link href="Static/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
+    <link href="Static/css/sb-admin-2.min.css" rel="stylesheet" type="text/css" />
+    <link href="Static/css/custom-education.css?v=20261007_13" rel="stylesheet" type="text/css" />
+
+    <!-- Core Local Offline JS Assets in Head for Guaranteed Early Availability -->
+    <script src="Static/jquery/jquery.min.js"></script>
+    <script src="Static/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="Static/js/education-app.js?v=20261007_09"></script>
+
+    <asp:ContentPlaceHolder ID="HeadContent" runat="server">
+    </asp:ContentPlaceHolder>
+</head>
+<body>
+    <form id="mainForm" runat="server">
+        <!-- Top Navigation Bar -->
+        <nav class="navbar navbar-expand-lg navbar-dark navbar-custom sticky-top">
+            <div class="container-fluid">
+                <!-- Branding -->
+                <a class="navbar-brand navbar-brand-custom" href="EmployeeEducation.aspx">
+                    <img src="Static/Images/newlrdelogo.png" alt="LRDE Logo" onerror="this.style.display='none'" />
+                    <div>
+                        <div style="line-height: 1.1; font-size: 1.15rem;">EMPLOYEE EDUCATION PORTAL</div>
+                        <div style="font-size: 0.72rem; color: #94a3b8; font-weight: 500; letter-spacing: 0.5px;">ELECTRONICS &amp; RADAR DEVELOPMENT ESTABLISHMENT</div>
+                    </div>
+                </a>
+
+                <!-- Mobile Toggle -->
+                <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Navigation Links -->
+                <div class="collapse navbar-collapse" id="navbarContent">
+                    <ul class="navbar-nav mr-auto ml-lg-3">
+                        <li class="nav-item">
+                            <a class="nav-link nav-link-custom <%= GetActiveNav("EmployeeEducation.aspx") %>" href="EmployeeEducation.aspx">
+                                <i class="fas fa-user-graduate mr-1"></i> My Education Details
+                            </a>
+                        </li>
+
+                        <!-- Admin Only Links -->
+                        <asp:PlaceHolder ID="phAdminNav" runat="server" Visible="false">
+                            <li class="nav-item">
+                                <a class="nav-link nav-link-custom <%= GetActiveNav("AdminDashboard.aspx") %>" href="AdminDashboard.aspx">
+                                    <i class="fas fa-tachometer-alt mr-1"></i> Admin Dashboard
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link nav-link-custom <%= GetActiveNav("AdminMasterData.aspx") %>" href="AdminMasterData.aspx">
+                                    <i class="fas fa-layer-group mr-1"></i> Master Catalog
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link nav-link-custom <%= GetActiveNav("AdminMigration.aspx") %>" href="AdminMigration.aspx">
+                                    <i class="fas fa-exchange-alt mr-1"></i> Data Migration
+                                </a>
+                            </li>
+                        </asp:PlaceHolder>
+                    </ul>
+
+                    <!-- User Information & Logout -->
+                    <ul class="navbar-nav align-items-center">
+                        <li class="nav-item mr-3">
+                            <div class="user-nav-badge">
+                                <div class="user-avatar-circle overflow-hidden p-0" style="border: 1.5px solid rgba(255,255,255,0.4); background: #334155; width: 34px; height: 34px;">
+                                    <asp:Image ID="imgNavAvatar" runat="server" AlternateText="User" style="width: 100%; height: 100%; object-fit: cover;" />
+                                </div>
+                                <div style="line-height: 1.2;">
+                                    <div style="font-weight: 700; font-size: 0.88rem;">
+                                        <asp:Literal ID="litNavUserName" runat="server">Employee</asp:Literal>
+                                    </div>
+                                    <div style="font-size: 0.72rem; color: #94a3b8;">
+                                        PCNO: <asp:Literal ID="litNavPCNO" runat="server">---</asp:Literal>
+                                        <asp:Literal ID="litNavRoleBadge" runat="server"></asp:Literal>
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="nav-item">
+                            <a href="Logout.aspx" class="btn btn-sm btn-outline-danger font-weight-bold" style="border-radius: 20px; padding: 5px 14px;">
+                                <i class="fas fa-sign-out-alt mr-1"></i> Logout
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content Wrapper -->
+        <main class="container-fluid py-3 px-3 px-xl-4" style="min-height: 80vh;">
+            <!-- Global Feedback Notification Banner -->
+            <asp:Panel ID="pnlGlobalAlert" runat="server" Visible="false" CssClass="alert alert-dismissible fade show mb-4" role="alert">
+                <asp:Literal ID="litAlertMessage" runat="server"></asp:Literal>
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </asp:Panel>
+
+            <asp:ContentPlaceHolder ID="MainContent" runat="server">
+            </asp:ContentPlaceHolder>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer-custom text-center">
+            <div class="container">
+                <p class="mb-0 text-muted">
+                    &copy; <%: DateTime.Now.Year %> Employee Education Details Portal &bull; All Rights Reserved
+                </p>
+            </div>
+        </footer>
+
+        <!-- Caution Confirmation Modal for Final Submission -->
+        <div id="submitCautionModal" class="submit-caution-backdrop" role="dialog" aria-modal="true" aria-labelledby="submitCautionTitle">
+            <div class="custom-modal-dialog" style="max-width: 490px; margin: auto;">
+                <div class="custom-modal-content caution-modal-content text-center p-4 shadow-lg">
+                    <!-- Warning Icon Badge -->
+                    <div class="mx-auto mb-3" style="width: 70px; height: 70px; border-radius: 50%; background: #fef3c7; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 8px rgba(254, 243, 199, 0.45);">
+                        <i class="fas fa-exclamation-triangle text-warning" style="font-size: 2.1rem;"></i>
+                    </div>
+
+                    <h4 id="submitCautionTitle" class="font-weight-bold text-gray-900 mb-2" style="font-size: 1.35rem;">
+                        Caution: Confirm Submission
+                    </h4>
+
+                    <!-- Main Caution Callout -->
+                    <div class="alert alert-warning py-2 px-3 mb-3 text-left small font-weight-bold" style="border-radius: 10px; border-left: 4px solid #f59e0b; background: #fffbeb; color: #92400e;">
+                        <i class="fas fa-exclamation-circle mr-1 text-warning" style="font-size: 1rem;"></i>
+                        Once submitted, qualification records CANNOT be edited or modified.
+                    </div>
+
+                    <p class="text-muted small mb-4" id="submitCautionMessageText" style="line-height: 1.5; font-size: 0.9rem;">
+                        Are you sure you want to finalize and submit your education records? Please verify that all details are accurate before continuing.
+                    </p>
+
+                    <!-- Modal Actions -->
+                    <div class="d-flex justify-content-center align-items-center" style="gap: 12px;">
+                        <button type="button" class="btn btn-light border font-weight-bold px-3 py-2 text-secondary" id="btnCancelCautionSubmit" style="border-radius: 8px; min-width: 110px;">
+                            <i class="fas fa-times mr-1"></i> Cancel
+                        </button>
+                        <button type="button" class="btn btn-edu-success font-weight-bold px-4 py-2 shadow-sm" id="btnConfirmCautionSubmit" style="border-radius: 8px; min-width: 175px;">
+                            <i class="fas fa-lock mr-1"></i> Yes, Submit &amp; Lock
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <asp:ContentPlaceHolder ID="ScriptsContent" runat="server">
+    </asp:ContentPlaceHolder>
+</body>
+</html>

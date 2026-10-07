@@ -1,0 +1,978 @@
+<label for="address">Main Qualification</label>
+                <select class="form-control" name="qual_main_cd_ajax">
+                    <option value="">--Select--</option>
+                    <option value="MSW">MASTER OF SOCIAL WORK</option>
+                    <option value="MTA">MASTER OF TOURISM ADMINISTRATION</option>
+                    <option value="MTH">MASTER OF THEOLOGY</option>
+                    <option value="MTP">MASTER OF TOWN PLANNING</option>
+                    <option value="MURP">MASTER OF URBAN AND REGIONAL PLANNING</option>
+                    <option value="MVSC">MASTER OFVERTINARY SCIENCE</option>
+                    <option value="PPC">PRE PROFESSIONAL COURSE</option>
+                    <option value="PUC">PRE UNIVERSITY COURSE</option>
+                    <option value="AMD">DIPLOMA IN AVIATION MEDICINE</option>
+                    <option value="DA">DIPLOMA IN ANAESTHESIA</option>
+                    <option value="DAM">DIPLOMA IN AYURVEDIC MEDICINE</option>
+                    <option value="DBA">DIPLOMA IN BUSINESS MANAGEMENT</option>
+                    <option value="DCD">DIPLOMA IN CHEST DISEASES</option>
+                    <option value="DCH">DIPLOMA IN  CHILD HEALTH</option>
+                    <option value="DCP">DIPLOMA IN CLINICAL PATHOLOGY</option>
+                    <option value="DCPM">DIPLOMA IN  CLINICAL PATHOLOGY AND MICROBIOLOGY</option>
+                    <option value="DD">DIPLOMA IN  DERMATOLOGY</option>
+                    <option value="DDM">DIPLOMA IN  DERMATOLOGICAL MEDICINE</option>
+                    <option value="DDR">DIPLOMA IN DIAGNOSTIC RADIOLOGY</option>
+                    <option value="DDVD">DIPLOMA IN DERMATOLOGY AND VENEREAL DISEASES</option>
+                    <option value="DE">DIPLOMA IN EMBRYOLOGY</option>
+                    <option value="DFM">DIPLOMA IN FORENSIC MEDICINE</option>
+                    <option value="DGO">DIPLOMA IN GYNACOLOGY AND OBSTRICTS</option>
+                    <option value="DH">DIPLOMA IN INDUSTRIAL HEALTH</option>
+                    <option value="DHE">DIPLOMA IN HEALTH EDUCATION</option>
+                    <option value="DLIB">DIPLOMA IN LIBRARY SCIENCE</option>
+                    <option value="DLO">DIPLOMA IN LARYNGOLOGY AND OTOLOGY</option>
+                    <option value="DLW">DIPLOMA IN LABOUR WELFARE</option>
+                    <option value="DMCW">VMETERNITY AND CHILD WELFARE</option>
+                    <option value="DME">DIPLOMA IN MEDICINAL ENGINEERING</option>
+                    <option value="DMRIT">DIPLOMA IN  DIPLOMA IN RADIO ISTOTOPE</option>
+                    <option value="B Ed">BACHELOR OF EDUCATION</option>
+                    <option value="M Ed">MASTER OF EDUCATION</option>
+                    <option value="DMLT">DIPLOMA IN MEDICAL LABORATORY TECHNOLOGY</option>
+                    <option value="DMP">DIPLOMA IN  MEDICAL PATHOGY AND BACTERIOLOGY</option>
+                    <option value="DMR">DIPLOMA IN MEDICAL RADIOLOGY</option>
+                    <option value="DMRD">DIPLOMA IN MEDICAL RADIO DIANOSIS</option>
+                    <option value="DPD">DIPLOMA IN PUBLIC ADMINISTRATION</option>
+                    <option value="DPE">DIPLOMA IN PHYSICAL EDUCATION</option>
+                    <option value="DTCD">DIPLOMA IN TUBERCULOSIS AND CHEST DESEASES</option>
+                    <option value="DTMH">DIPLOMA IN TROPICAL MEDICINE AND HGIENE</option>
+                    <option value="DMRE">DIPLOMA IN  MEDICAL RADIOLOLLGY AND ELECTROLOGY</option>
+                    <option value="MCM">MASTER IN COMPUTER MANAGEMENT</option>
+                    <option value="EG">ENGINEERING GRADUATES</option>
+                    <option value="MARCH">MASTER OF ARCHITECHURE</option>
+                    <option value="GDT">GRADUATE</option>
+                    <option value="PGD">POST GRADUATE DIPLOMA</option>
+                    <option value="PHDD">PHD (DOCTORATE)</option>
+                    <option value="DIPL">DIPLOMA</option>
+                    <option value="MPH">MPHIL</option>
+                    <option value="PG">POST GRADUATE</option>
+                    <option value="EPG">ENGINEERING POST GRADUATES</option>
+                    <option value="BDS">BACHELOR  OF DENTAL SURGERY</option>
+                    <option value="MTRI">10 th</option>
+                    <option value="SCI">12 th</option>
+                    <option value="UG">Undergraduate</option>
+                    <option value="PSY">MASTER OF PSYCHOLOGY</option>
+                    <option value="SOCIO">MASTER OF SOCIOLOGY</option>
+                    <option value="BMTRI">Less Than 10th</option>
+                    <option value="ITI">ITI</option>
+                    <option value="CC">CERTIFICATE COURSE</option>
+                    <option value="AMIE">AMIE/IETE</option>
+                    <option value="MPHIL">MASTER OF PHILOSOPHY</option>
+                    <option value="MTECH">MASTER OF TECHNOLOGY</option>
+                    <option value="DLITT">DIPLOMA IN LITERATURE</option>
+                    <option value="DSC">DIPLOMA IN SCIENCES</option>
+                    <option value="MSC">MASTER OF SCIENCE</option>
+                    <option value="BSC">BACHELOR OF SCIENCE</option>
+                    <option value="BE">BACHELOR OF ENGINEERING</option>
+                    <option value="ME">MASTER OF ENGINEERING</option>
+                    <option value="PHD">DOCTORATE IN PHILOSOPHY</option>
+                    <option value="BTECH">BACHELOR OF TECHNOLOGY</option>
+                    <option value="DENG">DIPLOMA IN ENGINEERING</option>
+                    <option value="OTHER">OTHER</option>
+                    <option value="MSENG">MASTER OF SCIENCE (ENGINEERING)</option>
+                    <option value="MCA">MASTER OF COMPUTER APPLICATIONS</option>
+                    <option value="BA">BACHOLER OF ARTS</option>
+                    <option value="MA">MASTER OF ARTS</option>
+                    <option value="MSURG">MASTER OF SURGERY</option>
+                    <option value="MD">DOCTRATE IN MEDICINE</option>
+                    <option value="MBBS">BACHELOR OF MEDICINE &amp;BACHLOR OF SURGERY </option>
+                    <option value="DPHIL">DOCTRATE IN PHILOSOPHY</option>
+                    <option value="BCOM">BACHELOR OF COMMERCE</option>
+                    <option value="MCOM">MASTER OF COMMERCE</option>
+                    <option value="BSCEN">BACHELOR OF SCIENCE (ENGG.)</option>
+                    <option value="DMRT">DIPLOMA IN  MEDICAL RADITION THERPY</option>
+                    <option value="DO">DIPLOMA IN OPHOPAEDIC SURGERY</option>
+                    <option value="DOMS">DIPLOMA IN  OPHALMIC MEDICINE AND SURGERY</option>
+                    <option value="DV">DIPLOMA IN VENERAEOLOGY</option>
+                    <option value="DVND">DIPLOMA IN VENERAEOLOGY AND DERMETOLOGY</option>
+                    <option value="DUGA">DIPLOMA IN  URBAN GOVT. AND ADMINISTRATION</option>
+                    <option value="JD">DIPLOMA IN JOURNALISM</option>
+                    <option value="TD">DIPLOMA IN  TEACHING</option>
+                    <option value="TTE">TRANING FOR TEACHING ENGLISH</option>
+                    <option value="TTG">TRANING OF TEACHERS IN GEOGRAPHY</option>
+                    <option value="DSTD">DIPLOMA IN SEXUALLY TRANSMITED DISEASES</option>
+                    <option value="DSS">DIPLOMA IN SOCIAL SERVICE</option>
+                    <option value="DPMNR">DIPLOMA IN PHYSICAL MEDICINE AND REHABILITATION</option>
+                    <option value="DIP">DIPLOMA IN PSYCHIARTRIC</option>
+                    <option value="DPM">DIPLOMA IN  PSYCHOLOGICAL MEDICINE</option>
+                    <option value="BARCH">BACHELOR OF ARCHITECHURE</option>
+                    <option value="BAL">BACHELOR OF ACADEMIC LAWS</option>
+                    <option value="BAM">BACHELOR OF AYURVEDIC MEDICINE</option>
+                    <option value="BBA">BACHELOR OF BUSINESS ADMINSTRATION</option>
+                    <option value="BBM">BACHELOR OF BUSINESS MANAGEMENT</option>
+                    <option value="BBS">BACHELOR OF BUSINESS STUDIES</option>
+                    <option value="BCL">BACHELOR OF CIVIL LAWS</option>
+                    <option value="BD">BACHELOR OF DRAMATICS</option>
+                    <option value="BDNCE">BACHELOR OF DANCE</option>
+                    <option value="BFA">BACHELOR OF FINE ARTS</option>
+                    <option value="BFSC">BACHELOR OF FISHERY SCIENCE</option>
+                    <option value="BGL">BACHELOR OF GENERAL LAWS</option>
+                    <option value="BHMS">BACHELOR OF HOMOEOPATHIC MEDICINE AND SURGERY</option>
+                    <option value="BHRD">BACHELOR OF HUMAN RESOURCE DEVELOPMENT</option>
+                    <option value="BHSC">BACHELOR OF HOME SCIENCE</option>
+                    <option value="BIL">BACHELOR OF INDUSTRIAL LAW</option>
+                    <option value="BIM">BACHELOR OF INDIAN MEDICINE</option>
+                    <option value="BIJ">BACHELOR OF JOURNALISM</option>
+                    <option value="BIJC">BACHELOR OF JOURNALISM AND COMMUNICATION</option>
+                    <option value="BIJMC">BACHELOR OF JOURNALISM AND MASS COMMUNICATION</option>
+                    <option value="LLB">BACHELOR OF LAWS</option>
+                    <option value="BLISC">BACHELOR OF LIBRARY SCIENCE AND INFORMATION SCIENCE</option>
+                    <option value="BLIB">BACHELOR OF LIBRARY SCIENCE</option>
+                    <option value="BLITT">BACHELOR OF LITERATURE</option>
+                    <option value="BMCJ">BACHELOR OF MASS COMMUNICATION AND JOURNALISM</option>
+                    <option value="BME">BACHELOR OF MECHANICAL ENGG</option>
+                    <option value="BMRSC">BACHELOR OF MEDICAL RESEARCH SCIENCE</option>
+                    <option value="BMETT">BACHELOR OF METALLURGY</option>
+                    <option value="BNYS">BACHELOR OF NATUROPATHY AND YOGIC SCIENCE</option>
+                    <option value="BOL">BACHELOR OF ORIENTAL LEARNING</option>
+                    <option value="BPA">BACHELOR OF PERFORMING ART</option>
+                    <option value="BPED">BACHELOR OF PHYSICAL EDUCATION</option>
+                    <option value="BPES">BACHELOR OF PHYSICAL EDUCATION AND SPORT SCIENCES</option>
+                    <option value="BPHRM">BACHELOR OF PHARMACY</option>
+                    <option value="BPHYT">BACHELOR OF PHYSIOTHERAPY</option>
+                    <option value="BRS">BACHELOR OF RURAL STUDIES</option>
+                    <option value="BSAM">BACHELOR OF SHUDDHA AURVEDIC MEDICINE</option>
+                    <option value="BSOSC">BACHELOR OF SOCIAL SCIENCE</option>
+                    <option value="BSW">BACHELOR OF SOCIAL WELFARE</option>
+                    <option value="BT">BACHELOR OF TEACHING</option>
+                    <option value="BTHO">BACHELOR OF OCCUPATIONAL THERAPY</option>
+                    <option value="BTEXT">BACHELOR OF TEXTILES</option>
+                    <option value="BTH">BACHELOR OF THEOLOGY</option>
+                    <option value="BUMS">BACHELOR OF UNANI MEDICINE AND SURGERY</option>
+                    <option value="BUTS">BACHELOR OF UNANI TIB AND SURGERY</option>
+                    <option value="BUMMS">BACHELOR OF UNANI MEDICENE WITH MORDERN MEDICINE AND SURGERY</option>
+                    <option value="BVA">BACHELOR OF VISUAL ARTS</option>
+                    <option value="BVASC">BACHELOR OF VERTERINARY ANIMAL SCIENCE</option>
+                    <option value="BVSC">BACHELOR OF VERTERINARY SCIENCE</option>
+                    <option value="BVSAH">BACHELOR OF VERTERINARY SCIENCE AND ANIMAL HUSBANDRY</option>
+                    <option value="DAYM">DOCTOR OF AYURVEDIC MEDICINE</option>
+                    <option value="DCL">DOCTOR OF CIVIL LAWS</option>
+                    <option value="DED">DOCTOR OF EDUCATION</option>
+                    <option value="DENGG">DOCTOR OF ENGINEERING</option>
+                    <option value="DHY">DOCTOR OF HYGIENE</option>
+                    <option value="LLD">DOCTOR OF LAWS</option>
+                    <option value="DM">DOCTOR OF MEDICINE</option>
+                    <option value="DMA">DOCTOR OF AURVEDIC MEDICINE</option>
+                    <option value="DMUS">DOCTOR OF MUSIC</option>
+                    <option value="DOL">DOCTOR OF ORIENTAL LEARNING</option>
+                    <option value="DTH">DOCTOR OF THEOLOGY</option>
+                    <option value="DUM">DOCTOR OF UNANI MEDICINE</option>
+                    <option value="INTER">INTERMEDIATE OR PLUS 2</option>
+                    <option value="LLM">MASTER OF LAWS</option>
+                    <option value="MAMM">MASTER OF AGRICULTURAL MARKETING MANAGEMENT</option>
+                    <option value="MAS">MASTER OF APPLIED SCIENCE</option>
+                    <option value="MAYSC">MASTER OF AYURVEDIC SCIENCE</option>
+                    <option value="MAYM">MASTER OF AYURVEDIC MEDICINE</option>
+                    <option value="MBA">MASTER OF BUSINESS ADMINSTRATION</option>
+                    <option value="MBF">MASTER OF BUSINESS FINANCE</option>
+                    <option value="MBM">MASTER OF BUSINESS MANAGEMENT</option>
+                    <option value="MBS">MASTER OF  BUSINESS STATISTICS</option>
+                    <option value="BMS">BACHELOR OF MEDICINE AND SURGERY(HOMEO)</option>
+                    <option value="MCH">MASTER OF CHIRUGY</option>
+                    <option value="MCJ">MASTER OF COMMUNICATION AND JOURNALISM</option>
+                    <option value="MCL">MASTER OF COMPARITIVE LAWS</option>
+                    <option value="MCP">MASTER OF CITY PLANNING</option>
+                    <option value="MCT">MASTER OF COLLEGE TEACHING</option>
+                    <option value="MCRP">MASTER OF CITY AND REGIONAL PLANNING</option>
+                    <option value="MDAY">DOCTOR OF MEDICINE (AYURVEDIC)</option>
+                    <option value="MDS">MASTER OF DENTAL SURGERY</option>
+                    <option value="MED">MASTER OF EDUCATION</option>
+                    <option value="MFA">MASTER OF ARTS</option>
+                    <option value="MFC">MASTER OF FINANCE AND CONTROL</option>
+                    <option value="MFSC">MASTER OF FISHERIES SCIENCE</option>
+                    <option value="MHED">MASTER OF HIGHER EDUCATION</option>
+                    <option value="MHSC">MASTER OF HOME SCIENCE</option>
+                    <option value="MIRPM">MASTER OF  RELATION AND PERSONNEL MANG</option>
+                    <option value="MJ">MASTER OF JOURNALISM</option>
+                    <option value="ML">MASTER OF LAWS</option>
+                    <option value="MLIS">MASTER OF  LIBRARY AND INFORMATION SCIENCE</option>
+                    <option value="MLS">MASTER OF LABOUR STUDIES</option>
+                    <option value="MLW">MASTER OF LABOUR WELFARE</option>
+                    <option value="MLIB">MASTER OF LIBRARY SCIENCE</option>
+                    <option value="MLITT">MASTER OF LITERATURE OR LETTERS</option>
+                    <option value="MMS">MASTER OF MANAGEMENT STUDIES</option>
+                    <option value="MMSC">MASTER OF MANGEMENT SCIENCE</option>
+                    <option value="MPE">MASTER OF PHYSICAL EDUCATION</option>
+                    <option value="MPES">MASTER OF PHYSICAL EDUCATION AND SPORTS</option>
+                    <option value="MPM">MASTER OF  PHYSICAL MANAGEMENT</option>
+                    <option value="MPHRM">MASTER OF PHARMACY</option>
+                    <option value="MRP">MASTER OF REGIONAL PLANNING</option>
+                    <option value="MRS">MASTER OF  RURAL STUDIES</option>
+                    <option value="MS">MASTER OF SURGERY</option>
+                    <option value="MENG">MASTER OF ENGINEERING</option>
+                    <option value="MFOOD">MASTER OF FOOD AND TECHNOLOGY</option>
+                    <option value="MMED">MASTER OF SCIENCE  MEDICAL</option>
+                    <option value="BCA">BACHELOR OF COMPUTER APP.</option>
+                    <option value="MCA">MASTER OF COMPUTER APPL.</option>
+                </select>
+            </div>
+            <div class="col-sm-4">
+                <label for="address">Sub Qualification</label>
+                <select class="form-control" name="qual_sub_cd_ajax">
+                    <option value="">--Select--</option>
+                    <option value="NANO">NANO SCIENCE AND ENGINEERING</option>
+                    <option value="RACE">RADAR AND COMMUNICATION ENGG.</option>
+                    <option value="RACE">RADAR AND COMMUNICATION ENGG.</option>
+                    <option value="COM">COMMERCE</option>
+                    <option value="ADEL">ADVANCED ELECTRONICS</option>
+                    <option value="ADMT">ADVANCED MANF. &amp;TECH</option>
+                    <option value="ANMT">ANTENA &amp;MEASUREMENT TECHNIQUE</option>
+                    <option value="APH">APPLIED HYDROLOGY</option>
+                    <option value="APE">APPLIED ELECTRONICS</option>
+                    <option value="APO">APPLIED OPTICS</option>
+                    <option value="ARAN">ARRAY ANTENNA</option>
+                    <option value="CREO">COMMN. &amp;RADAR ENGG.</option>
+                    <option value="CTSP">COMMN. &amp;THEORY &amp;SIGNAL PROCESSING</option>
+                    <option value="CSYG">CONTROL SYS. &amp;GUIDANCE</option>
+                    <option value="DSST">DEFENCE STRATEGIC STUDIES</option>
+                    <option value="DENGG">DESIGN ENGG.</option>
+                    <option value="DEMQ">DESIGN OF MECH. EQPT.</option>
+                    <option value="DSCE">DIGITAL SYS. COMP. ELECTRONIC</option>
+                    <option value="AENGG">AERO ENGG.</option>
+                    <option value="ELTE">ELECTRONICS &amp;TELECOM</option>
+                    <option value="FLM">FLUID MECHANICS</option>
+                    <option value="GAST ">GAS TURBINE</option>
+                    <option value="GUIM">GUIDED MISSILES</option>
+                    <option value="GUIW">GUIDED WEAPONS</option>
+                    <option value="HEPEN">HEAT POWER &amp;ENGG.</option>
+                    <option value="INDM">IND MATHS</option>
+                    <option value="INDE">IND ELECTEO</option>
+                    <option value="INCS">INST &amp;CONTROL SYSTEM</option>
+                    <option value="INEC">INTEGRATED ELECTRONINCS &amp;CIRCUITS</option>
+                    <option value="INOP">INTEGRATED OPTICS</option>
+                    <option value="LEOE">LASER &amp;ELECTRO OPTICAL ENGG.</option>
+                    <option value="MCDY">M/C DYNAMICS</option>
+                    <option value="MACDE">MACHINE DESIGN</option>
+                    <option value="MRENG">MICROWAVE &amp;RADAR ENGG.</option>
+                    <option value="MIELE">MICROWAVE ELECTRONICS</option>
+                    <option value="NPHYS">NUCLEAR PHYSICS</option>
+                    <option value="OCGG">OCEANOGRAPHY</option>
+                    <option value="ORACH">ORGANIC CHEMISTRY</option>
+                    <option value="PHRCH">PHARM. CHEM.</option>
+                    <option value="PHYIN">PHYS &amp;INST</option>
+                    <option value="PHYME">PHYSICAL METALLURGY</option>
+                    <option value="PLBRE">PLANT BREEDING</option>
+                    <option value="PLEN">PLANT ENGG.</option>
+                    <option value="POE">POWER ELECTRONICS</option>
+                    <option value="PEMLL">PROCESS METALLURGY</option>
+                    <option value="PRENG">PRODUCTION ENGG.</option>
+                    <option value="REBTE">RUBBER TECHNOLOGY</option>
+                    <option value="SOSTA">SOLID STATE TECH.</option>
+                    <option value="SPER">SPACE ENGG. &amp;ROCKETRY </option>
+                    <option value="SIT">SPATIAL INFORMATION TECHNOLOGY</option>
+                    <option value="SYSCO">SYS CONTROL</option>
+                    <option value="SYSSO">SYSTEM SOFTWARE</option>
+                    <option value="TELES">TELECOM SYS ENGG.</option>
+                    <option value="THERE">THERMAL ENGG.</option>
+                    <option value="TODE">TOOL DESIGN</option>
+                    <option value="TOOEN">TOOL ENGG.</option>
+                    <option value="WELTE">WELDING TECH</option>
+                    <option value="COMME">COMMUNICATION  ENGG.</option>
+                    <option value="PM">PROJECT MANAGEMENT</option>
+                    <option value="ELINS">ELECTRONICS AND INSTRUMENTATION</option>
+                    <option value="FINAN">FINANCE</option>
+                    <option value="MARKT">MARKETING</option>
+                    <option value="HR">HUMAN RESOURCE</option>
+                    <option value="TECHM">TECHNOLOGY MANAGEMENT</option>
+                    <option value="SEFEG">SAFETY ENGINEERING</option>
+                    <option value="PSY">PSYCHOLOGY</option>
+                    <option value="SOCIO">SOCIOLOGY</option>
+                    <option value="ELECT">ELECTRONICS</option>
+                    <option value="OTHER">OTHER</option>
+                    <option value="MANG">MANAGEMENT</option>
+                    <option value="GENSC">GENERAL SCIENCE</option>
+                    <option value="OEAOC">OPTO-ELECT AND OPTICAL COMM</option>
+                    <option value="BICHM">BIOCHEMISTRY</option>
+                    <option value="BIO">BIOLOGY</option>
+                    <option value="BOT">BOTANY</option>
+                    <option value="CHEM">CHEMISTRY</option>
+                    <option value="MATH">MATHEMATICS</option>
+                    <option value="AERO">AERONAUTICAL ENGG</option>
+                    <option value="CHEMI">CHEMICAL ENG</option>
+                    <option value="CIVIL">CIVIL ENG</option>
+                    <option value="ELCL">ELECTRICAL ENG</option>
+                    <option value="INDST">INDUSTRIAL ENG</option>
+                    <option value="INSTR">INSTRUMENTATION ENG</option>
+                    <option value="CHEM">CHEMISTRY</option>
+                    <option value="PHY">PHYSICS</option>
+                    <option value="ZOO">ZOOLOGY</option>
+                    <option value="E&amp;C">ELECTRONICS &amp;COMMUNICATION</option>
+                    <option value="HST">HISTORY</option>
+                    <option value="GEO">GEOGRAPHY</option>
+                    <option value="ECO">ECONOMICS</option>
+                    <option value="AUTMO">AUTO MOBILE</option>
+                    <option value="HND">HINDI</option>
+                    <option value="PHIL">PHILOSOPHY</option>
+                    <option value="ENG">ENGLISH</option>
+                    <option value="ECO">ECONOMICS</option>
+                    <option value="PHYL">PHYSIOLOGY</option>
+                    <option value="ACC">ACCOUNTS</option>
+                    <option value="ECO">ECONOMICS</option>
+                    <option value="MED">MEDICINE</option>
+                    <option value="PHIL">PHILOSOPHY</option>
+                    <option value="CHEM">CHEMISTRY</option>
+                    <option value="BIOT">BIOTECHNOLOGY</option>
+                    <option value="PHYL">PHYSIOLOGY</option>
+                    <option value="COMPE">COMPUTER ENG</option>
+                    <option value="COMPS">COMPUTER SCIENCE</option>
+                    <option value="DCHEM">CHEMICALS</option>
+                    <option value="DMECH">MECHANICAL ENGG.</option>
+                    <option value="STATS">STATISTICS</option>
+                    <option value="POL">POLITICAL SCIENCE</option>
+                    <option value="VET">VETERINARY</option>
+                    <option value="HORT">HORTICULTURE</option>
+                    <option value="MED">MEDICINE</option>
+                    <option value="SS">SOCIAL SCIENCE</option>
+                    <option value="HS">HOME SCIENCE</option>
+                    <option value="NARCH">NAVAL ARCHITECHTURE</option>
+                    <option value="BIOMD">BIO-MEDICINE</option>
+                    <option value="DEN">DENTAL</option>
+                    <option value="NA">NA</option>
+                    <option value="ENV">ENVIRONMENTAL SCIENCE</option>
+                    <option value="LAW">LAWS</option>
+                    <option value="OPERA">OPERATION RESEARCH</option>
+                    <option value="MATSC">MATERIAL SCIENCE  </option>
+                    <option value="SOFTE">SOFTWARE ENGINEERING</option>
+                    <option value="MIBIO">MICRO BIOLOGY</option>
+                    <option value="BLIB">LIBRARY SCIENCE</option>
+                    <option value="POUSC">POULTRY SCIENCE</option>
+                    <option value="IT">INFORMATION TECHNOLOGY</option>
+                    <option value="METAL">METALLURGY</option>
+                    <option value="MATEC">MATERIAL TECHNOLOGY</option>
+                    <option value="FSAT">FOOD SCIENCE AND TECHNOLOGY</option>
+                    <option value="TEXTL">TEXTILES</option>
+                    <option value="MAREN">MARINE ENGG</option>
+                    <option value="GEOL">GEOLOGY</option>
+                    <option value="AVONI">AVIONICS</option>
+                    <option value="AROSE">AERO SPACE ENGG</option>
+                    <option value="AGRSC">AGRICULTURE SCIENCE</option>
+                    <option value="IPR">INTELLECTUAL PROPERTY RIGHTS</option>
+                    <option value="MM">MATERIAL MANAGEMENT</option>
+                    <option value="EE">ELECTRICAL AND ELECTRONICS</option>
+                    <option value="AG">AGRONOMY</option>
+                    <option value="EL">ELECTRICIAN</option>
+                    <option value="WEL">WELDER</option>
+                    <option value="CR">CARPENTER</option>
+                    <option value="DM">DIESEL MECHANIC</option>
+                    <option value="DSP">DIGITAL SIGNAL PROCESSING</option>
+                    <option value="AC">Refrigeration and AC</option>
+                    <option value="DTP">DTP OPERATOR</option>
+                    <option value="DR(M)">DRAUGHTSMAN(MECHANICAL)</option>
+                    <option value="CP">CLINICAL PSYCHOLOGY</option>
+                    <option value="MSD">MECHANICAL SYSTEMS DESIGN</option>
+                    <option value="JY">JYOTISH</option>
+                    <option value="SMW">SHEET METAL WORKER</option>
+                    <option value="AP">APPLIED PSYCHOLOGY</option>
+                    <option value="HP">HEALTH PSYCHOLOGY</option>
+                    <option value="PHG">PHOTOGRAPHY</option>
+                    <option value="SRD">SUSTAINABLE RURAL DEVELOPMENT</option>
+                    <option value="BP">BIOPHYSICS</option>
+                    <option value="P">PAINTER</option>
+                    <option value="DPHG">DIGITAL PHOTOGRAPHY</option>
+                    <option value="SS1">SOFTWARE SYSTEMS</option>
+                    <option value="MD">MECHANICAL DESIGN</option>
+                    <option value="MBC">MEDICAL BIOCHEMISTRY</option>
+                    <option value="TUR">TURNER</option>
+                    <option value="MEC">MACHINIST</option>
+                    <option value="COPA">COMP. OPR &amp;PROGRAMMING ASST</option>
+                    <option value="BB">BOOK BINDER</option>
+                    <option value="RFM">RADIO FREQUENCY AND MICROWAVE ENGINEERING</option>
+                    <option value="TRANS">TRANSLATION</option>
+                    <option value="HMCT">HOTEL MANAGEMENT AND CATERING TECHNOLOGY</option>
+                    <option value="INSSP">INSTRUMENTATION AND SIGNAL PROCESSING</option>
+                    <option value="MME">MATERIALS &amp;METALLURGICAL ENGINEERING</option>
+                    <option value="IM">INDUSTRIAL METALLURGY</option>
+                    <option value="HG">HUMAN GENETICS</option>
+                    <option value="AM">ADDITIVE MANUFACTURING</option>
+                    <option value="M&amp;S">MODELLING &amp;SIMULATION</option>
+                    <option value="FIT">FITTER</option>
+                    <option value="ACF">ACCOUNTS AND FINANACE</option>
+                    <option value="PAD">PUBLIC ADMINISTRATION</option>
+                    <option value="AI">ARTIFICIAL INTELLIGENCE</option>
+                    <option value="IS">INDUSTRIAL SAFETY</option>
+                </select>
+
+
+
+
+
+
+
+Id	Name	Group
+0	*	*
+1	B.Sc	B.Sc
+2	BE	BE
+3	ME	ME
+4	M.Sc	M.Sc
+5	AMIETE	BE
+6	B.Tech	BE
+7	M.Tech	ME
+8	AMIE	BE
+9	MCA	MCA
+10	MBA	MBA
+11	Ph.D	Ph.D
+12	M.Phil	M.Phil
+13	Diploma	DIP
+14	M.Li.Sc	M.Li.Sc
+15	B.Com	B.Com
+16	BA	BA
+17	MA	MA
+18	M.Com	M.Com
+19	SSLC/X Class	SSLC
+20	PUC/XII	PUC/XII
+21	B.Sc. (Engg.)	B.Sc. (Engg.)
+22	DMIT	DIP
+23	DIIT	*
+24	Post Diploma	Post Diploma Course
+25	DRE	DRE
+26	DEE	Diploma
+27	MIETE	ME
+28	M.Sc.(Engg)	M.Tech
+29	PGDIM	PGDIM
+30	DIM	Diploma in Management
+31	ADM	MANAGEMENT
+32	SDM	MANAGEMENT
+33	DLE (Hons)	Diploma
+34	Grad. IETE	*
+35	B.Ed.	*
+36	DTE	Diploma
+37	DME	Diploma
+38	A.D.I.M	Management
+39	D.H.R.M	Management
+40	BTE	BTE
+41	I.T.I	ITI
+42	NAC	NAC
+43	Stenography	Stenography
+44	NTC	NTC
+45	MBBS	Medicine
+46	B.Sc. PAR I	B.Sc.
+47	PG	*
+48	DCE	DCE
+49	B.Li.Sc	B.Li.Sc
+50	LLB	LAW
+51	ATC	ATC
+52	RVTI(w)	RVTI(w)
+53	HMT	HMT
+54	FITTER	ITI
+55	BBA	BBA
+56	'A' Level	DOEACC
+57	'O' Level	DOEACC
+58	PGDHRM	PGD
+59	BBM	BBM
+60	PGDMM	PGD
+61	ADST	Diploma
+62	BL	Law
+63	MSW	MSW
+64	HDMM	MANAGEMENT
+65	BCA	BCA
+66	NCVT	NCVT
+67	M S E E	Masters
+68	SSC	SSC
+69	AISSE	AISSE
+70	AISSCE	AISSCE
+71	D.E.C.E	DECE
+72	PGD (VLSI)	PGD
+73	THSLC	THSLC
+74	VHSC	VHSC
+75	PGDCS	PGDCS
+76	GRDUATION	GRDUATION
+77	PGDFM	PGDFM
+78	Dual Degree	BE
+79	PG Dip & IR	Diploma
+80	Below SSLC	Below SSLC
+81	MS	MS
+82	BLI Sc	BLI Sc
+83	MLI Sc	MLI Sc
+84	LLM	Law
+85	VHSE	VHSE
+86	PG DIIT	*
+87	GMP	*
+88	PGDPM	PGDPM
+89	DMM	DMM
+90	PGDMM	PGDMM
+91	DIT	DIT
+92	DIV	DIV
+93	PGDBA	PGDBA
+
+
+
+
+
+
+
+
+
+
+
+University/Institution
+0	*
+1	Anna University
+2	Bangalore University
+3	Andhra University
+4	IIT Kanpur
+5	IIT Madras
+6	IIT Delhi
+7	IISc, Bangalore
+8	U.P.T.U
+9	IIT, Guwahati
+10	IIT, Roorkee
+11	Benaras Hindu University
+12	BITS, Pilani
+13	IIT, Kharagpur
+14	REC, Warangal
+15	REC, Tiruchy
+16	REC, Suratkal
+17	REC, Calicut
+18	REC, Silacher
+19	MREC, Jaipur
+20	Karnataka University
+21	Mysore University
+22	Mangalore University
+23	Kuvempu University
+24	Annamalai University
+25	JNTU, Kakinada
+26	JNTU, Ananthpur
+27	Nagarjuna University
+28	Osmania University
+29	Sri Venkateswara University
+30	Central University, Hyderabad
+31	Bharathiar University
+32	Bharathidasan University
+33	Madras University
+34	Rajasthan University
+35	Kakatiya University
+36	Manonmani Sundaranathan University
+37	Sastra University
+38	Cochin University of Science & Technology, Cochin
+39	Vikram University, Ujjain
+40	REC, Bhopal
+41	Jainarayan Vayas University, Jodhpur
+42	Gulbarga University, Gulbarga
+43	Madhurai Kamaraj University
+44	Jawaharlal Nehru University, Delhi
+45	Delhi University, Delhi
+46	Pondicherry University
+47	U BTE Roorkee
+48	Kerala University
+49	REC, Hamirpur
+50	Mahatma Gandhi University, Kerala
+51	REC,Surat
+52	Gurunanak Dev University, Punjab
+53	Madurai University
+54	RD University
+55	Rajiv Gandhi Proudyogiki Vishwavidyalaya, Bhopal
+56	IIT Bombay
+57	BIT Mesra Ranchi
+58	IAT,Pune
+59	JNU,Delhi
+60	Avadh University
+61	Utkal University
+62	Mahatma Gandhi University,Kerala
+63	Geherwal University
+64	Allahabad University
+65	University of Calicut
+66	IETE, New Delhi
+67	Institution of Engineers, New Delhi
+68	M.N.N.I.T., Allahabad
+69	MNB Garwal University
+70	MERRUT University
+71	POONA University
+72	University of Calicut
+73	Calcutta University
+74	DDU Gorakhpur University
+75	KREC Surathkal
+76	Dr.H.S.Gaur University, Sagar
+77	Barkatulla University, Bhopal
+78	Lucknow University
+79	Kumoan University, Nainital
+80	BITS Ranchi
+81	Bundel Khand University
+82	Dayalbagh University
+83	REC, Bhalki
+84	Aligarh Muslim University, Aligarh
+85	Ranchi University
+86	REC, Rourkela
+87	Sambalpur University, Orissa
+88	AIMA,New Delhi
+89	IGNOU, NEW DELHI
+90	MIT,Madras
+91	Gorakhpur University
+92	Jabalpur University
+93	Banaras Hindu University
+94	Burdwan University
+95	REC,Durgapur
+96	MJP Rohilkhand, Bareley
+97	Maharshi Dayanand University, Rohtak
+98	Gujarat University
+99	B.S.B.A University, Muz,Bihar
+100	Rohilkhand University
+101	South Gujarat University
+102	REC,Jalandhar
+103	Jamia Millia Central University Delhi
+104	Amaravati University
+105	Marthwada University
+106	Centre for Electronics Design Technology
+107	MANIPUR UNIVERSITY
+108	Army University
+109	Punjab University
+110	IAI
+111	Bhopal University
+112	Punjab Technical University
+113	Dr.Ambedkar University
+114	REC,Allahabad
+115	M.B.T.I Kanpur
+116	I.E.T, C.S.J.M University Kanpur
+117	D.A.V.V, Indore
+118	Meghalaya Board of School Education
+119	North Eastern Hill University
+120	ISCE BOARD
+121	Assam University
+122	Institution of Engineers(India), Kolkatta
+123	Govind Ballabh Pant University of Agriculture & Technology
+124	University of Kerala
+125	PATNA UNIVERSITY
+126	DOEACC Centre
+127	NIIT Ltd.
+128	VIDYASAGAR UNIVERSITY
+129	Visweswaraiah Technological University, Belgaum
+130	University of Kalyani
+131	Bengal Engineering College, Shibpore
+132	Pt. RaviShankar University, Raipur
+133	MNIT,Jaipur
+134	Sri KrishnaDevaraya University
+135	Nagpur University
+136	Kannur University
+137	V B University, Hazaribagh
+138	SVNIT, Surat
+139	IIMM,Bangalore
+140	NIT,Jamshedpur
+141	NIT, Durgapur
+142	NIT, Hamirpur
+143	NIT, Silchar
+144	NIT, Warangal
+145	RGPV, Bhopal
+146	NIT, Kurukshetra
+147	Govind Ballab Pant Engg. College
+148	UPTUI, KNIT
+149	UP BTE, Lucknow
+150	West Bengal University
+151	ABV-IIITM, Gwalior
+152	BES University
+153	DIAT, Pune
+154	Kurukshetra University
+155	Calicut University
+156	NIT,Raipur
+157	NIT, Rourkela
+158	NIT, PATNA
+159	delhi university
+160	Dilasagram Convent high school, ballarpur
+161	Gurunanak College of Science, Ballarpur
+162	Govt. College of Engineering, Karad
+163	Indian Institute of Info. Tech, Allahabad
+164	U A Board
+165	UP Board Allahabad
+166	KSEEB
+167	PUE
+168	VTU
+169	General Education Department
+170	Higher Secondary Board
+171	BTER Jodhpur
+172	WBBSE
+173	WBCHSE
+174	WBSCTE
+175	JNTU
+176	Board of Secondary School Education
+177	Board of Intermediate Education
+178	IIT, Bangalore
+179	BIT, Durg
+180	MP Board
+181	SBTET
+182	AU
+183	IISC
+184	CSBE
+185	CUSAT
+186	nagarjuna University
+187	JNTU, Ananthapur, AP
+188	IIT Kharagpur
+189	State board of technical Education
+190	Kerala Board
+191	IISC
+192	osmania University
+193	NIT, Calicut
+194	ICSE/DPS, shimla
+195	CBSE/RED, Jhajjar
+196	K V Ponda (CBSE)
+197	Board of Public Exam. Kerala
+198	Board of Technical Education
+199	Z P High school
+200	Dept.of Tech.Edu, Kerala
+201	Board of Vocational HR SEC Edn
+202	University of Hyderabad
+203	UP Board
+204	BSEB, Bihar
+205	BIEE, Bihar
+206	V.B.U, Hazaribag
+207	PSG College of Technology, Coimbatore
+208	Anna University
+209	MAGADH UNIVERSITY BODH GAYA
+210	BIEC PATNA
+211	Veer Kunwar Singh University, ARA
+212	BSE, AP
+213	BIE, AP
+214	University of Bradford
+215	B.T.E UP
+216	Govt of A.P, Dept of Emp & Training
+217	Ministry of Labour & EMP
+218	Pre University Board
+219	WBSCTE, Kolkata
+220	Jiwaji University
+221	CBSE Board
+222	IIT, Rajasthan
+223	IIT, Gandhinagar
+224	VVB SS School
+225	CM science College,Darbhanga (BSEB)
+226	IIT, Patna
+227	ANU, Guntar
+228	Dept. Tech. Edu., Karnataka
+229	S.B.T.E Bihar
+230	B.S.E.H
+231	H.S.B.T.E
+232	UTTARAKHAND TECHNICAL UNIVERSITY
+233	NATIONAL COLLEGE BANGALORE
+234	ST. JOSEPHS COLLEGE BANGALORE
+235	SSC BOARD
+236	INTER BOARD
+237	NIT Trichy
+238	VINAYAKA MISSION UNIVERSITY SALEM
+239	CETE STQC,Hyderabad
+240	IDEMI MUMBAI
+241	Karnataka Board
+242	BSE, ODISHA
+243	HSCE, ODISHA
+244	SCTE & VT, ODISHA
+245	Sikkim Manipal University
+246	B.S.E.R, AJMER
+247	B.T.E.R, Jodhpur
+248	IGNOU
+249	AMITE
+250	Pune Board
+251	Mumbai Board
+252	P E C, Chandigarh
+253	RGUKT, Basar
+254	Nashik Board
+255	Automomous. Inst of Govt of Maharashtra
+256	Himachal Pradesh University Shimla Himachal Pradesh
+257	HP BOARD OF SCHOOL EDUCATION DHARAMSHAL HIMACHAL PRADESH
+258	ASSAM STATE BOARD
+259	UNIVERSITY OF MADRAS
+260	BANGALORE UNIVERSITY
+261	DREXEL UNIVERSITY, PA, USA
+262	BIHAR INTERMEDIATE EDUCATION COUNCIL, PATNA
+263	Biju Patnaik University of Technology, Orissa, Rourkela
+264	Jawaharlal Nehru Technological University, Hyderabad
+265	Karnataka State Open University
+266	Shivaji University, Kolhapur
+267	Bharati Vidypeetha University, Pune
+268	VHSE BOARD
+269	Board of Hariyana
+270	Oxford Evening Polytechnic, JP Nagar, Bengaluru
+271	University of Poona
+272	GPM College
+273	GRM Sr Sec School
+274	NCVT
+275	IIT, Jodhpur
+276	NIT, SURATHKAL
+277	Tripura
+278	IIM LUCKNOW
+279	AP Board
+280	Tamilnadu State Board
+281	CENTRAL UNIVERSITY OF RAJASTHAN
+282	University of Ajmer
+283	NIT, Agartala
+284	Dr APJ Abdul Kalam Technical University, UP
+285	CHSE, ODISHA
+286	CHSS, Jaipur
+287	JNVU, JODHPUR
+288	Pune University
+289	IIT, Indore
+290	NIT, Delhi
+291	MANIT, Bhopal
+292	GGV, Bilaspur
+293	UTTARAKHAND BOARD
+294	GRAPHIC ERA UNIVERSITY
+295	Maharastra State Board
+296	VIT, PUNE
+297	MSBSHSE, PUNE
+298	NIT, Srinagar
+299	Siddarth University
+300	RBSE, Ajmer
+301	Rajasthan board
+302	Banarthali University
+303	D.U
+304	SEBA, Assam
+305	SCTE, Assam
+306	NERIST, Nirjuli
+307	IIT, Hyderabad
+308	UPTU, Lucknow
+309	TRRRSVM MIC Kashipur
+310	NIT. Uttarakhand
+311	KV Bhaderwah
+312	BSF Sr Sec School
+313	AKTU
+314	MIT Muzaharpur
+315	YMCA University
+316	IIT, Roorkee
+317	SDM Sr Sec School
+318	Green Meadows
+319	G.B.P.U.A.T, Pantnagar
+320	KV (AFS), Bormer
+321	Dundlod Public School Jhunjhunu
+322	KVM Public Sr Sec School, Sikar
+323	Govt poly, Nasik
+324	CMM Jabalpur
+325	TMBU, Bhagalpur
+326	BVDU, Pune
+327	MIT-SDE, Pune
+328	GOVT.POLYTECHNIC BANKA
+329	DNS COLLEGE BHUSIARAJOUN
+330	H.S.SALEMPUR
+331	SBTE, Bihar
+332	JAC board
+333	SBTE Jharkhand
+334	SSIS,DERABASSI
+335	GMSSS,CHANDIGARH SEC-16
+336	GGDSD,PUNJAB UNIVERSITY
+337	SSK NAND INTERCOLL
+338	PMV POLYTECNIC MATHURA
+339	S.V GOVT POLYTECHNIC
+340	ICSE Board
+341	ISC
+342	UBTER
+343	SEBA
+344	AHSEC
+345	W.B.B.S.E
+346	W.B.C.H.S.E
+347	Maharashtra State Board
+348	Hemwanti Nandan Bahuguna Garhwal University
+349	MADAN MOHAN MALAVIYA UNIVERSITY OF TECHNOLOGY, GORAKHPUR, UP
+
+
+
+
+Id	Subject Name	Subject Group
+0	*	*
+1	Manufacturing Technology	Mechanical
+2	Microwave and Radar Electronics	Electronics
+3	Antennas	Electronics
+4	Structures	Civil Engg
+5	Information Technology	Computer Science
+6	Computer Science	Computer Science
+7	Electronics and Communications	Electronics
+8	Electrical and Electronics	Electrical
+9	Telecommunication Engineering	Telecommunication
+10	Mechanical Engineering	Mechanical
+11	Civil Engineering	Civil
+12	Physics	Physics
+13	Chemistry	Chemistry
+14	Mathematics	Mathematics
+15	Information Science	Computer Science
+16	Chemical Engineering	Chemical
+17	Computer Engineering	Computer Science
+18	Instrumentation Technology	Electronics
+19	Computer Applications	Computer Science
+20	Commerce	Commerce
+21	Arts	Arts
+22	Management	Management
+23	English	Languages
+24	Electronics	Electronics
+25	Engineering Design	Mechanical
+26	Communication Systems	Electronics
+27	Electronics and Instrumentation	Electronics
+28	Power Electronics	Electrical
+29	Electronics and Telecommunication	Electronics
+30	Radar Systems	Radar
+31	Electrical Engineering	Electrical
+32	Applied Physics	Physics
+33	Microwave Engineering	Electronics
+34	Modelling and Simulation	Physics
+35	Advanced Electronics	Electronics
+36	Computer Technology	Computer Science
+37	Heat Power	Heat Power
+38	Thermal Engineering	Mechanical
+39	Laser and ElectroOptics	Electronics
+40	Engineering Systems	Computer Science
+41	Signal Processing	Electronics
+42	Finance	Management
+43	Solid State Technology	Physics
+44	Spherical Vector Wave Function	*
+45	VLSI Design	Electronics
+46	Library Science	*
+47	Control and Instrumentation	Electrical
+48	Radar and Communcation	Radar
+49	Process Engineering	*
+50	Machine Design	Mechanical
+51	Software Systems	Computer Science
+52	System Science and Automation	Computer Science
+53	Aerospace Engineering	Aerospace
+54	Industrial Electronics	Electronics
+55	Communication Engineering	Electronics
+56	Electronic Design	Electronics
+57	Production Engineering	Mechanical
+58	Sound and TV	Electronics
+59	Automobile Engineering	Mechanical
+60	Computer Communication	Computer Science
+61	Optical Communication	Electronics
+62	Craftsman	Craftsman
+63	Electricals	Electrical
+64	Radio Mechanics	Electronics
+65	Public Relations	Administratiorn
+66	Buisiness Administration	Administration
+67	Business Management	Management
+68	Law	Law
+69	ElectroPlating	Chemical
+70	Power Systems	Electrical
+71	Reliability Engineering	Electronics
+72	Marketing	Management
+73	Digital Systems	Electronics
+74	OPTOELECTRONICS	OPTOELECTRONICS
+75	Hindi	Arts
+76	Digital Electronics and Advanced Communications	Electronics
+77	Computer and Information Science	Computer
+78	Microwave Signals & Systems	Electronics
+79	Material science	Mechanical
+80	Human Resource Management	HRM
+81	POLITICAL SCIENCE	GENERAL
+82	ECONOMICS	GENERAL
+83	RADIO & TRANSISTOR	ELECTRONICS
+84	Secratarial Practice	PA
+85	Printing Technology	Printing
+86	Communication Control & Networking	Computer Science
+87	Zoology	Biological Sciences
+88	Sociology	Arts
+89	High Voltage Engineering	Electronics
+90	Computer Science & Engineering	Computer Science
+91	DLLELW	Miscellaneous
+92	science	science
+93	General	general
+94	Maths	Maths
+95	Control System Engineering	Electrical
+96	RF & Microwave	Electronics and Electrical Communication Engineering
+97	INSTRUMENTATION AND CONTROL ENGINEERING	INSTRUMENTATION
+98	Radio Frequency Design and Technology	Electronics
+99	MS	MASTER OF SCIENCE
+100	MS	MS
+101	MICROELECTRONICS	MICROELECTRONICS
+102	PCMB	INTERMEDIATE
+103	MS	ENGINEERING
+104	M.S.	M.S.
+105	PCM	PCM
+106	MASTER OF SCINECE	MASTER OF SCIENCE
+107	Computer & Information Science	Computer Science
+108	MACHINIST	MECHANICAL
+109	INSTRUMENTATION ENGINEERING	INSTRUMENTATION
