@@ -8,6 +8,252 @@
 
     window.EduApp = {
         /**
+         * Checks if a value is null, whitespace, or a placeholder symbol like '*', '-', '?', etc.
+         */
+        isPlaceholder: function (val) {
+            if (!val) return true;
+            var v = $.trim(val);
+            if (v === '' || v === '*' || v === '**' || v === '***' || 
+                v === '-' || v === '--' || v === '---' || 
+                v === '.' || v === '..' || v === '?' || v === '??') return true;
+            var u = v.toUpperCase();
+            return (u === 'NOT SPECIFIED' || u === 'UNKNOWN' || u === 'NULL');
+        },
+
+        /**
+         * Specialization validator: Allows 'N/A', 'NA', 'General', 'Not Applicable' etc.,
+         * but blocks empty values and placeholder symbols ('*', '?', etc.).
+         */
+        isInvalidSpec: function (val) {
+            if (!val) return true;
+            var v = $.trim(val);
+            if (v === '' || v === '*' || v === '**' || v === '***' || v === '?' || v === '??') return true;
+            return false;
+        },
+
+        /**
+         * Displays an instant validation error inside the modal without page reload
+         */
+        showModalError: function (msg) {
+            var $clientBanner = $('#modalClientErrorBanner');
+            var $clientText = $('#modalClientErrorText');
+            if ($clientBanner.length) {
+                $clientText.html(msg);
+                $clientBanner.slideDown(150);
+            }
+            var $serverPnl = $('[id$="pnlFormError"]');
+            if ($serverPnl.length && $serverPnl.is(':visible')) {
+                $serverPnl.hide();
+            }
+            // Scroll modal body to top so error banner is immediately visible
+            var $modalBody = $('[id$="pnlModal"] .modal-body');
+            if ($modalBody.length) {
+                $modalBody.scrollTop(0);
+            }
+        },
+
+        /**
+         * Clears all error banners inside the modal
+         */
+        clearModalError: function () {
+            $('#modalClientErrorBanner').slideUp(100);
+            $('[id$="pnlFormError"]').slideUp(100);
+        },
+
+        /**
+         * Evaluates all modal inputs for missing or placeholder values.
+         * Returns { msg: string, $focus: jQueryElement } or null if valid.
+         */
+        getModalValidationError: function () {
+            var $main = $('select[id$="ddlMainQual"]');
+            var $sub = $('select[id$="ddlSubQual"]');
+            var $yr = $('select[id$="ddlYearPassed"]');
+            var $spec = $('input[id$="txtSpecialization"]');
+            var $univ = $('select[id$="ddlUniversity"]');
+            var $coll = $('select[id$="ddlCollege"]');
+            var $customColl = $('input[id$="txtCustomCollege"]');
+            var $scoreType = $('select[id$="ddlScoreType"]');
+            var $score = $('input[id$="txtCgpaMarks"]');
+            var $grade = $('select[id$="ddlGrade"]');
+
+            var mainVal = $main.val();
+            if (!mainVal || EduApp.isPlaceholder(mainVal)) {
+                return { msg: "Please select a valid Main Qualification from the list.", $focus: $main };
+            }
+
+            var subVal = $sub.val();
+            if (!subVal || EduApp.isPlaceholder(subVal)) {
+                return { msg: "Please select a valid Sub Qualification / Stream from the list.", $focus: $sub };
+            }
+
+            var yrVal = $yr.val();
+            if (!yrVal || EduApp.isPlaceholder(yrVal)) {
+                return { msg: "Please select a valid Passing Year from the list.", $focus: $yr };
+            }
+
+            var specVal = $.trim($spec.val());
+            if (EduApp.isInvalidSpec(specVal)) {
+                return { msg: "Please enter Specialization / Major Subject (or 'N/A' if not applicable). Placeholder values like '*' are not allowed.", $focus: $spec };
+            }
+
+            var univVal = $univ.val();
+            if (!univVal || EduApp.isPlaceholder(univVal)) {
+                return { msg: "Please select a valid University / Board from the list. Placeholder values like '*' are not allowed.", $focus: $univ };
+            }
+
+            var collVal = $coll.val();
+            if (!collVal || EduApp.isPlaceholder(collVal)) {
+                return { msg: "Please select a valid College / School Name from the list.", $focus: $coll };
+            }
+            if (collVal === 'OTHER' || (collVal && collVal.indexOf('Other') === 0)) {
+                var customVal = $.trim($customColl.val());
+                if (!customVal || EduApp.isPlaceholder(customVal)) {
+                    return { msg: "Please specify your College / School Name in the text box provided. Placeholder values like '*' are not allowed.", $focus: $customColl };
+                }
+            }
+
+            var rawScore = $.trim($score.val());
+            if (!rawScore || EduApp.isPlaceholder(rawScore)) {
+                return { msg: "Please enter valid Marks / Percentage / CGPA. Placeholder values like '*' are not allowed.", $focus: $score };
+            }
+
+            var scoreType = $scoreType.val() || 'Percentage';
+            var cleanNumStr = rawScore.replace(/%/g, '').replace(/cgpa/gi, '').trim();
+            var scoreNum = parseFloat(cleanNumStr);
+            if (!isNaN(scoreNum)) {
+                if (scoreType === 'Percentage') {
+                    if (scoreNum < 0 || scoreNum > 100) {
+                        return { msg: "Percentage must be a valid value between 0.00% and 100.00%.", $focus: $score };
+                    }
+                } else if (scoreType === 'CGPA') {
+                    if (scoreNum < 0 || scoreNum > 10) {
+                        return { msg: "CGPA must be a valid value between 0.00 and 10.00 (on standard 10-point scale).", $focus: $score };
+                    }
+                }
+            }
+
+            var gradeVal = $grade.val();
+            if (!gradeVal || EduApp.isPlaceholder(gradeVal)) {
+                return { msg: "Please select a valid Grade / Division from the list.", $focus: $grade };
+            }
+
+            return null;
+        },
+
+        /**
+         * Validates the modal form prior to save.
+         * Returns false and displays inline error if invalid; returns true if valid.
+         */
+        validateModalForm: function (isFinalSubmit) {
+            var valErr = EduApp.getModalValidationError();
+            if (valErr) {
+                EduApp.showModalError(valErr.msg);
+                if (valErr.$focus && valErr.$focus.length) {
+                    var $trig = valErr.$focus.data('searchable-trigger');
+                    if ($trig && $trig.length) $trig.focus();
+                    else valErr.$focus.focus();
+                }
+                return false;
+            }
+
+            EduApp.clearModalError();
+            // Sync hidden fields before postback
+            $('input[id$="hfSelectedMainQual"]').val($('select[id$="ddlMainQual"]').val() || '');
+            $('input[id$="hfSelectedSubQual"]').val($('select[id$="ddlSubQual"]').val() || '');
+            return true;
+        },
+
+        /**
+         * Opens the Add Qualification modal seamlessly with 0-latency and zero page refresh
+         */
+        openAddModal: function () {
+            var $modal = $('[id$="pnlModal"]');
+            if ($modal.length === 0) return;
+
+            // Reset record ID and hidden fields
+            $('[id$="hfEditEduId"]').val('0');
+            $('[id$="hfSelectedMainQual"]').val('');
+            $('[id$="hfSelectedSubQual"]').val('');
+
+            // Reset modal title
+            $('[id$="litModalTitle"], #lblModalTitleText').text('Add Qualification Record');
+
+            // Reset Dropdowns
+            var $main = $('[id$="ddlMainQual"]');
+            var $sub = $('[id$="ddlSubQual"]');
+            var $univ = $('[id$="ddlUniversity"]');
+            var $college = $('[id$="ddlCollege"]');
+            var $year = $('[id$="ddlYearPassed"]');
+            var $grade = $('[id$="ddlGrade"]');
+
+            if ($main.length) {
+                $main.val('').trigger('change');
+                EduApp.updateTriggerText($main);
+            }
+            if ($sub.length) {
+                if (typeof $sub.data('filter-fn') === 'function') {
+                    $sub.data('filter-fn')();
+                } else {
+                    $sub.empty().append($('<option>', { value: '', text: '-- Select Sub Qualification / Stream --' }));
+                    $sub.val('').trigger('change');
+                    EduApp.updateTriggerText($sub);
+                }
+            }
+            if ($univ.length) {
+                $univ.val('').trigger('change');
+                EduApp.updateTriggerText($univ);
+            }
+            if ($college.length) {
+                $college.val('').trigger('change');
+                EduApp.updateTriggerText($college);
+            }
+            if ($year.length) {
+                $year.val('').trigger('change');
+                EduApp.updateTriggerText($year);
+            }
+            if ($grade.length) {
+                $grade.val('').trigger('change');
+                EduApp.updateTriggerText($grade);
+            }
+
+            // Reset inputs
+            $('[id$="txtSpecialization"]').val('');
+            $('[id$="txtCustomCollege"]').val('');
+            $('[id$="pnlCustomCollege"]').hide();
+            $('[id$="ddlScoreType"]').val('Percentage');
+            $('[id$="txtCgpaMarks"]').val('').attr('placeholder', 'e.g. 78.50%');
+            $('[id$="chkIsHighest"]').prop('checked', false);
+            $('[id$="txtRemarks"]').val('');
+            EduApp.clearModalError();
+
+            // Display modal smoothly with flex positioning
+            $modal.css('display', 'flex').hide().fadeIn(150);
+
+            // Set focus to the main qualification selector
+            setTimeout(function () {
+                var $trig = $main.data('searchable-trigger');
+                if ($trig && $trig.length) {
+                    $trig.focus();
+                } else if ($main.length) {
+                    $main.focus();
+                }
+            }, 60);
+        },
+
+        /**
+         * Closes the Qualification modal seamlessly without refreshing the page
+         */
+        closeModal: function () {
+            var $modal = $('[id$="pnlModal"]');
+            if ($modal.length) {
+                $modal.fadeOut(120, function () {
+                    $(this).css('display', 'none');
+                });
+            }
+            EduApp.clearModalError();
+        },
+
+        /**
          * Converts any standard HTML <select> into a modern Searchable Dropdown with live search filter
          */
         makeSearchable: function (selector, placeholderText) {
@@ -331,44 +577,170 @@
 
             if ($main.length === 0 || $sub.length === 0) return;
 
-            // Cache original sub qualification options
-            if (!$sub.data('all-options')) {
-                var options = [];
-                $sub.find('option').each(function () {
-                    options.push({
-                        value: $(this).val(),
-                        text: $(this).text(),
-                        mainCode: $(this).attr('data-main') || ''
+            function getAllSubOptions() {
+                // Priority 1: Serialized global array from server (guaranteed to have all data-main values)
+                if (window.EDU_ALL_SUB_QUALS && window.EDU_ALL_SUB_QUALS.length > 0) {
+                    return window.EDU_ALL_SUB_QUALS.map(function (item) {
+                        return {
+                            value: item.code,
+                            text: item.name,
+                            mainCode: item.main || ''
+                        };
                     });
-                });
-                $sub.data('all-options', options);
+                }
+
+                // Priority 2: Cache from DOM
+                if (!$sub.data('all-options') || $sub.data('all-options').length <= 2) {
+                    var options = [];
+                    $sub.find('option').each(function () {
+                        options.push({
+                            value: $(this).val(),
+                            text: $(this).text(),
+                            mainCode: $(this).attr('data-main') || ''
+                        });
+                    });
+                    if (options.length > 2) {
+                        $sub.data('all-options', options);
+                    }
+                }
+                return $sub.data('all-options') || [];
             }
 
+            function normalizeQualCode(code) {
+                if (!code) return '';
+                return code.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            }
+
+            // Related degree families to ensure complete options for equivalent qualifications
+            var degreeFamilies = {
+                // Engineering UG
+                'BE': ['BE', 'BTECH', 'BSCEN', 'AMIE', 'BME', 'DENG'],
+                'BTECH': ['BTECH', 'BE', 'BSCEN', 'AMIE', 'BME', 'DENG'],
+                'BSCEN': ['BSCEN', 'BE', 'BTECH', 'AMIE'],
+                'AMIE': ['AMIE', 'BE', 'BTECH'],
+                'BME': ['BME', 'BE', 'BTECH'],
+
+                // Engineering PG
+                'ME': ['ME', 'MTECH', 'MSENG', 'MENG', 'BE', 'BTECH'],
+                'MTECH': ['MTECH', 'ME', 'MSENG', 'MENG', 'BE', 'BTECH'],
+                'MSENG': ['MSENG', 'ME', 'MTECH', 'BE', 'BTECH'],
+                'MENG': ['MENG', 'ME', 'MTECH', 'BE', 'BTECH'],
+
+                // Diploma
+                'DENG': ['DENG', 'DIPL', 'DIP', 'BE', 'BTECH'],
+                'DIPL': ['DIPL', 'DENG', 'DIP'],
+
+                // Higher Secondary (PUC / 12th)
+                'PUC': ['PUC', 'INTER', 'SCI', '12TH'],
+                'INTER': ['INTER', 'PUC', 'SCI', '12TH'],
+                'SCI': ['SCI', '12TH', 'PUC', 'INTER'],
+                '12TH': ['12TH', 'SCI', 'PUC', 'INTER'],
+
+                // Secondary (10th)
+                'MTRI': ['MTRI', '10TH', 'BMTRI'],
+                '10TH': ['10TH', 'MTRI', 'BMTRI'],
+                'BMTRI': ['BMTRI', 'MTRI', '10TH'],
+
+                // Business & Management
+                'BBA': ['BBA', 'BBM', 'BBS'],
+                'BBM': ['BBM', 'BBA', 'BBS'],
+                'BBS': ['BBS', 'BBA', 'BBM'],
+                'MBA': ['MBA', 'MMS', 'MBM'],
+                'MMS': ['MMS', 'MBA', 'MBM'],
+                'MBM': ['MBM', 'MBA', 'MMS'],
+
+                // Computer Applications
+                'BCA': ['BCA', 'MCA'],
+                'MCA': ['MCA', 'BCA'],
+
+                // Science
+                'BSC': ['BSC', 'MSC'],
+                'MSC': ['MSC', 'BSC'],
+
+                // Commerce
+                'BCOM': ['BCOM', 'MCOM'],
+                'MCOM': ['MCOM', 'BCOM'],
+
+                // Arts
+                'BA': ['BA', 'MA'],
+                'MA': ['MA', 'BA'],
+
+                // Law
+                'LLB': ['LLB', 'BAL', 'LLM'],
+                'BAL': ['BAL', 'LLB', 'LLM'],
+                'LLM': ['LLM', 'LLB'],
+
+                // Medicine
+                'MBBS': ['MBBS', 'MD', 'MS', 'BDS', 'BVSC'],
+                'MD': ['MD', 'MBBS', 'MS'],
+                'MS': ['MS', 'MBBS', 'MD'],
+                'BDS': ['BDS', 'MBBS'],
+
+                // ITI
+                'ITI': ['ITI', 'CC']
+            };
+
             function filterSubOptions() {
-                var selectedMain = $main.val();
-                var currentSubVal = $sub.val();
-                var allOptions = $sub.data('all-options');
+                var rawSelected = ($main.val() || '').trim();
+                var selectedNorm = normalizeQualCode(rawSelected);
+                var currentSubVal = $sub.val() || $('input[id$="hfSelectedSubQual"]').val();
+                var allOptions = getAllSubOptions();
 
                 $sub.empty();
                 $sub.append($('<option>', { value: '', text: '-- Select Sub Qualification / Stream --' }));
 
-                if (!selectedMain) {
+                if (!rawSelected) {
+                    var seenAll = {};
                     $.each(allOptions, function (i, opt) {
-                        if (opt.value) {
+                        if (opt.value && !seenAll[opt.value]) {
+                            seenAll[opt.value] = true;
                             $sub.append($('<option>', { value: opt.value, text: opt.text }));
                         }
                     });
                 } else {
-                    var matchedCount = 0;
+                    var familyList = degreeFamilies[selectedNorm] || [selectedNorm];
+                    var allowedMains = familyList.concat([rawSelected, selectedNorm]);
+                    var seenCodes = {};
+                    var regularOptions = [];
+                    var fallbackOptions = [];
+
                     $.each(allOptions, function (i, opt) {
                         if (!opt.value) return;
-                        if (opt.mainCode === selectedMain || opt.mainCode === '' || opt.value === 'OTHER' || opt.value === 'GENERAL' || opt.value === 'NA') {
-                            $sub.append($('<option>', { value: opt.value, text: opt.text }));
-                            matchedCount++;
+
+                        var isUniversal = (opt.value === 'OTHER' || opt.value === 'GENERAL' || opt.value === 'NA');
+                        var optNorm = normalizeQualCode(opt.mainCode);
+                        var isDirectMatch = (opt.mainCode === rawSelected || (optNorm && optNorm === selectedNorm));
+                        var isFamilyMatch = (optNorm && allowedMains.indexOf(optNorm) !== -1);
+
+                        if (isDirectMatch || isFamilyMatch) {
+                            if (!seenCodes[opt.value]) {
+                                seenCodes[opt.value] = true;
+                                regularOptions.push(opt);
+                            }
+                        } else if (isUniversal) {
+                            if (!seenCodes[opt.value]) {
+                                seenCodes[opt.value] = true;
+                                fallbackOptions.push(opt);
+                            }
                         }
                     });
 
-                    if (matchedCount === 0) {
+                    // Sort regular streams alphabetically
+                    regularOptions.sort(function (a, b) {
+                        return a.text.localeCompare(b.text);
+                    });
+
+                    // Append regular options
+                    $.each(regularOptions, function (i, opt) {
+                        $sub.append($('<option>', { value: opt.value, text: opt.text }));
+                    });
+
+                    // Append fallbacks at the end
+                    if (fallbackOptions.length > 0) {
+                        $.each(fallbackOptions, function (i, opt) {
+                            $sub.append($('<option>', { value: opt.value, text: opt.text }));
+                        });
+                    } else if (regularOptions.length === 0) {
                         $sub.append($('<option>', { value: 'GENERAL', text: 'General' }));
                         $sub.append($('<option>', { value: 'OTHER', text: 'Other (Specify in Specialization)' }));
                     }
@@ -377,7 +749,14 @@
                 // Restore previous selection if present
                 if (currentSubVal && $sub.find('option[value="' + currentSubVal + '"]').length > 0) {
                     $sub.val(currentSubVal);
+                } else if (currentSubVal) {
+                    // Custom stream or not in family - append to guarantee it is NEVER dropped
+                    $sub.append($('<option>', { value: currentSubVal, text: currentSubVal }));
+                    $sub.val(currentSubVal);
                 }
+
+                // Sync to hidden field
+                $('input[id$="hfSelectedSubQual"]').val($sub.val() || '');
 
                 // Refresh searchable dropdown for sub qualification
                 if ($sub.data('searchable-initialized')) {
@@ -385,13 +764,32 @@
                 }
             }
 
-            $main.on('change', function () {
+            // Store filter function reference on element
+            $sub.data('filter-fn', filterSubOptions);
+
+            $main.off('change.cascade').on('change.cascade', function () {
+                var mVal = $(this).val();
+                $('input[id$="hfSelectedMainQual"]').val(mVal);
+                EduApp.clearModalError();
                 filterSubOptions();
+            });
+
+            $sub.off('change.cascade').on('change.cascade', function () {
+                var sVal = $(this).val();
+                $('input[id$="hfSelectedSubQual"]').val(sVal);
+                EduApp.clearModalError();
             });
 
             // Make both searchable
             EduApp.makeSearchable($main, '-- Search Main Qualification --');
             EduApp.makeSearchable($sub, '-- Search Sub Qualification / Stream --');
+
+            // If main qualification is selected in hidden field but not in dropdown, sync it
+            var hfMainVal = $('input[id$="hfSelectedMainQual"]').val();
+            if (!$main.val() && hfMainVal) {
+                $main.val(hfMainVal);
+                EduApp.updateTriggerText($main);
+            }
 
             // If main qualification is already selected on load (e.g. edit mode), filter immediately
             if ($main.val()) {
@@ -529,25 +927,8 @@
         var trigger = EduApp._pendingSubmitTrigger;
         EduApp.hideSubmitCaution();
         if (trigger) {
-            var $t = $(trigger);
-            var btnName = $t.attr('name');
-            var btnVal = $t.val() || '';
-            var form = $t.closest('form')[0];
-
-            if (form) {
-                if (btnName && !$('input[name="' + btnName + '"][type="hidden"]').length) {
-                    var $hidden = $('<input type="hidden">').attr('name', btnName).val(btnVal);
-                    $(form).append($hidden);
-                }
-                if (typeof form.submit === 'function') {
-                    form.submit();
-                } else {
-                    HTMLFormElement.prototype.submit.call(form);
-                }
-            } else {
-                trigger.__confirmed = true;
-                trigger.click();
-            }
+            trigger.__confirmed = true;
+            trigger.click();
         }
     });
 
@@ -563,7 +944,7 @@
         }
     });
 
-    // Intercept submit buttons to show caution message before submitting
+    // Intercept submit buttons to validate or show caution message before submitting
     $(document).on('click', '.btn-submit-with-caution', function (e) {
         if (this.__confirmed) {
             this.__confirmed = false;
@@ -572,17 +953,33 @@
 
         // Check if this is the modal's Save & Submit button
         var isModalRecord = (this.id && this.id.indexOf('btnSaveAndSubmit') > -1);
+
         if (isModalRecord) {
-            var mainVal = $('select[id$="ddlMainQual"]').val();
-            var subVal = $('select[id$="ddlSubQual"]').val();
-            var yrVal = $('select[id$="ddlYearPassed"]').val();
-            var specVal = $.trim($('input[id$="txtSpecialization"]').val());
-            var univVal = $('select[id$="ddlUniversity"]').val();
-            var cgpaVal = $.trim($('input[id$="txtCgpaMarks"]').val());
-            var gradeVal = $('select[id$="ddlGrade"]').val();
-            // If required fields are blank, let native submit run so validation error shows in modal
-            if (!mainVal || !subVal || !yrVal || !specVal || !univVal || !cgpaVal || !gradeVal) {
-                return true;
+            var valErr = EduApp.getModalValidationError();
+            if (valErr) {
+                e.preventDefault();
+                e.stopPropagation();
+                EduApp.showModalError(valErr.msg);
+                if (valErr.$focus && valErr.$focus.length) {
+                    var $trig = valErr.$focus.data('searchable-trigger');
+                    if ($trig && $trig.length) $trig.focus();
+                    else valErr.$focus.focus();
+                }
+                return false;
+            }
+
+            // Clear any error if valid
+            EduApp.clearModalError();
+            // Sync hidden fields
+            $('input[id$="hfSelectedMainQual"]').val($('select[id$="ddlMainQual"]').val() || '');
+            $('input[id$="hfSelectedSubQual"]').val($('select[id$="ddlSubQual"]').val() || '');
+        } else {
+            // Final submission from banner or bottom button
+            // If there are records flagged with incomplete placeholders on page, block immediately
+            if ($('.badge-record-incomplete').length > 0) {
+                e.preventDefault();
+                alert("Submission Blocked: You have draft qualification records containing placeholder values (such as '*'). Please click 'Edit' on each flagged record and select proper qualifications, college/school, university, and passing year before submitting.");
+                return false;
             }
         }
 
@@ -592,6 +989,21 @@
             : "Are you sure you want to finalize and submit your education records? Once submitted, they will be locked as official entries and cannot be edited.";
         EduApp.showSubmitCaution(this, msg);
         return false;
+    });
+
+    // Safeguard for Save Draft button
+    $(document).on('click', '.btn-save-draft', function (e) {
+        if (!EduApp.validateModalForm(false)) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+        return true;
+    });
+
+    // Auto-clear modal error when user interacts with inputs
+    $(document).on('input change', '[id$="pnlModal"] input, [id$="pnlModal"] select', function () {
+        EduApp.clearModalError();
     });
 
     // Global click outside listener to close any open dropdowns
@@ -637,6 +1049,23 @@
     $(document).ready(function () {
         EduApp.initAllSearchable();
         EduApp.initIntranetPhotos();
+
+        // Close modal on backdrop click
+        $(document).on('click', '.custom-modal-backdrop', function (e) {
+            if ($(e.target).hasClass('custom-modal-backdrop') || $(e.target).is('[id$="pnlModal"]')) {
+                EduApp.closeModal();
+            }
+        });
+
+        // Close modal on Escape key press
+        $(document).on('keydown', function (e) {
+            if (e.key === 'Escape' || e.keyCode === 27) {
+                var $modal = $('[id$="pnlModal"]:visible');
+                if ($modal.length > 0) {
+                    EduApp.closeModal();
+                }
+            }
+        });
     });
 
     // Support for ASP.NET AJAX partial postbacks if present

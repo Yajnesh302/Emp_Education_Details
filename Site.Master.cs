@@ -82,7 +82,14 @@ namespace EducationApp
                 "(function(){{function r(){{if(window.EduApp&&EduApp.showToast){{EduApp.showToast('{0}','{1}',{2});}}else{{setTimeout(r,50);}}}}if(document.readyState==='loading'){{document.addEventListener('DOMContentLoaded',r);}}else{{r();}}}})();",
                 cleanMsg, type, durationMs
             );
-            Page.ClientScript.RegisterStartupScript(Page.GetType(), "Toast_" + Guid.NewGuid().ToString("N"), script, true);
+            if (ScriptManager.GetCurrent(Page) != null)
+            {
+                ScriptManager.RegisterStartupScript(Page, Page.GetType(), "Toast_" + Guid.NewGuid().ToString("N"), script, true);
+            }
+            else
+            {
+                Page.ClientScript.RegisterStartupScript(Page.GetType(), "Toast_" + Guid.NewGuid().ToString("N"), script, true);
+            }
         }
     }
 }

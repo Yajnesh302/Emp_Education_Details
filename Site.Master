@@ -13,12 +13,12 @@
     <link href="Static/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css" />
     <link href="Static/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
     <link href="Static/css/sb-admin-2.min.css" rel="stylesheet" type="text/css" />
-    <link href="Static/css/custom-education.css?v=20261007_13" rel="stylesheet" type="text/css" />
+    <link href="Static/css/custom-education.css?v=20261013_31" rel="stylesheet" type="text/css" />
 
     <!-- Core Local Offline JS Assets in Head for Guaranteed Early Availability -->
     <script src="Static/jquery/jquery.min.js"></script>
     <script src="Static/bootstrap/js/bootstrap.bundle.min.js"></script>
-    <script src="Static/js/education-app.js?v=20261007_09"></script>
+    <script src="Static/js/education-app.js?v=20261013_31"></script>
 
     <asp:ContentPlaceHolder ID="HeadContent" runat="server">
     </asp:ContentPlaceHolder>

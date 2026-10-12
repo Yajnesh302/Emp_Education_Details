@@ -98,6 +98,13 @@
 </asp:Content>
 
 <asp:Content ID="Content2" ContentPlaceHolderID="MainContent" runat="server">
+    <!-- Built-in AJAX ScriptManager for Partial Postbacks (Zero Full Page Refresh) -->
+    <asp:ScriptManager ID="smEducation" runat="server" EnablePartialRendering="true" />
+
+    <!-- Asynchronous UpdatePanel to Ensure Zero Full Page Reloads on validation or modal actions -->
+    <asp:UpdatePanel ID="upEducation" runat="server" UpdateMode="Always">
+        <ContentTemplate>
+
     <!-- Page Header & Action Bar -->
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
         <div>
@@ -107,79 +114,86 @@
             <p class="text-muted small mb-0">Record, review, and maintain your official educational qualifications</p>
         </div>
         <div class="mt-2 mt-md-0">
-            <asp:Button ID="btnOpenAddModal" runat="server" Text="+ Add Qualification" CssClass="btn btn-edu-primary font-weight-bold px-3 py-2 shadow-sm" OnClick="btnOpenAddModal_Click" />
+            <asp:Button ID="btnOpenAddModal" runat="server" Text="+ Add Qualification" CssClass="btn btn-edu-primary font-weight-bold px-3 py-2 shadow-sm" OnClientClick="EduApp.openAddModal(); return false;" OnClick="btnOpenAddModal_Click" />
         </div>
     </div>
 
     <div class="row">
         <!-- LEFT SIDE: Employee Information & Photo Card -->
-        <div class="emp-profile-sidebar-col col-12 mb-4">
-            <div class="emp-side-card shadow-sm text-center">
+        <div class="col-xl-3 col-lg-4 col-md-5 col-12 mb-4 emp-profile-sidebar-col">
+            <div class="emp-side-card text-center">
                 <!-- Decorative Top Banner -->
-                <div class="emp-side-banner"></div>
+                <div class="emp-side-banner">
+                    <span class="emp-side-banner-tag"><i class="fas fa-shield-alt mr-1"></i> LRDE</span>
+                </div>
 
                 <!-- Profile Photo Frame -->
                 <div class="emp-side-avatar-wrapper">
                     <div class="emp-side-avatar-frame">
                         <asp:Image ID="imgEmpPhoto" runat="server" AlternateText="Employee Photo" />
                     </div>
+                    <div class="emp-avatar-status-dot" title="Active Employee"></div>
                 </div>
 
                 <!-- Employee Details -->
-                <div class="p-3 pt-1 px-3">
-                    <h5 class="font-weight-bold text-gray-900 mb-1" style="font-size: 1.12rem; line-height: 1.3;">
+                <div class="emp-side-body">
+                    <h5 class="emp-name-title">
                         <asp:Literal ID="litEmpName" runat="server"></asp:Literal>
                     </h5>
 
-                    <div class="mb-2">
-                        <span class="badge badge-light border text-primary font-weight-bold px-2 py-1" style="font-size: 0.82rem;">
+                    <div>
+                        <span class="emp-pcno-pill">
                             <i class="fas fa-id-badge mr-1"></i> PCNO: <asp:Literal ID="litEmpPCNO" runat="server"></asp:Literal>
                         </span>
                     </div>
 
-                    <div class="text-muted small mb-1 font-weight-bold" style="font-size: 0.85rem;">
+                    <div class="emp-designation-text">
                         <asp:Literal ID="litEmpDesignation" runat="server">---</asp:Literal>
                     </div>
 
-                    <div class="text-secondary small font-weight-bold mb-3" style="font-size: 0.85rem;">
-                        <i class="fas fa-building mr-1 text-muted"></i>
+                    <div class="emp-division-text">
+                        <i class="fas fa-building text-muted mr-1"></i>
                         <asp:Literal ID="litEmpDivision" runat="server">---</asp:Literal>
                     </div>
 
-                    <hr class="my-2.5" style="border-top: 1px solid #f1f5f9;" />
+                    <hr class="emp-side-divider" />
 
                     <!-- Current Submission Status -->
                     <div class="mb-3">
-                        <div class="text-uppercase text-muted font-weight-bold mb-1.5" style="font-size: 0.7rem; letter-spacing: 0.5px;">
-                            Profile Status
+                        <div class="emp-section-subtitle">
+                            <i class="fas fa-check-circle mr-1 text-primary"></i> Profile Status
                         </div>
                         <asp:Literal ID="litSubmissionStatusPill" runat="server"></asp:Literal>
                     </div>
 
-                    <!-- Quick Academic Stats -->
-                    <div class="p-2.5 rounded text-left mb-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="small text-muted font-weight-600" style="font-size: 0.82rem;">Qualifications:</span>
-                            <span class="badge badge-primary font-weight-bold px-2"><asp:Literal ID="litStatQualCount" runat="server">0</asp:Literal></span>
+                    <!-- Quick Academic Stats 2-Tile Grid -->
+                    <div class="emp-metrics-grid">
+                        <div class="emp-metric-tile">
+                            <i class="fas fa-graduation-cap metric-tile-icon"></i>
+                            <div class="metric-tile-number">
+                                <asp:Literal ID="litStatQualCount" runat="server">0</asp:Literal>
+                            </div>
+                            <div class="metric-tile-caption">Qualifications</div>
                         </div>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="small text-muted font-weight-600" style="font-size: 0.82rem;">Highest:</span>
-                            <span class="small font-weight-bold text-gray-900 text-truncate ml-1" style="max-width: 145px; font-size: 0.82rem;">
-                                <asp:Literal ID="litStatHighestQual" runat="server">---</asp:Literal>
-                            </span>
+                        <div class="emp-metric-tile" title='<%= HighestQualTitle %>'>
+                            <i class="fas fa-award metric-tile-icon"></i>
+                            <div class="metric-tile-text">
+                                <asp:Literal ID="litStatHighestQual" runat="server">None</asp:Literal>
+                            </div>
+                            <div class="metric-tile-caption">Highest Degree</div>
                         </div>
                     </div>
 
                     <!-- Add Qualification Shortcut Button -->
                     <div>
-                        <asp:Button ID="btnSidebarAdd" runat="server" Text="+ Add Qualification" CssClass="btn btn-edu-primary btn-block font-weight-bold shadow-sm py-2" style="font-size: 0.88rem;" OnClick="btnOpenAddModal_Click" />
+                        <asp:Button ID="btnSidebarAdd" runat="server" Text="+ Add Qualification" CssClass="btn btn-sidebar-action font-weight-bold" OnClientClick="EduApp.openAddModal(); return false;" OnClick="btnOpenAddModal_Click" />
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- RIGHT SIDE: Main Qualifications Table & Actions -->
-        <div class="emp-main-content-col col-12">
+        <div class="col-xl-9 col-lg-8 col-md-7 col-12 emp-main-content-col">
             <!-- Status Alerts / Guidance -->
             <asp:PlaceHolder ID="phSubmittedNotice" runat="server" Visible="false">
                 <div class="alert alert-success d-flex align-items-center mb-4 py-3 px-4 shadow-sm" style="border-radius: 12px; border-left: 5px solid #10b981; background: #ecfdf5;">
@@ -209,6 +223,28 @@
                         <div class="small text-danger font-weight-bold mt-1">
                             <i class="fas fa-exclamation-triangle mr-1"></i> Caution: Once submitted, records cannot be edited
                         </div>
+                    </div>
+                </div>
+            </asp:PlaceHolder>
+
+            <!-- Incomplete Legacy Draft Records Warning Banner -->
+            <asp:PlaceHolder ID="phDraftIncompleteNotice" runat="server" Visible="false">
+                <div class="alert alert-danger mb-4 py-3 px-4 shadow-sm" style="border-radius: 12px; border-left: 5px solid #ef4444; background: #fef2f2;">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="fas fa-exclamation-triangle fa-2x text-danger mr-3 flex-shrink-0"></i>
+                        <div>
+                            <div class="font-weight-bold text-danger" style="font-size: 1.05rem;">
+                                Action Required: <asp:Literal ID="litDraftIncompleteCount" runat="server">0</asp:Literal> Incomplete Qualification Record(s) Detected
+                            </div>
+                            <div class="small text-muted mt-1">
+                                Some records imported from the old database contain placeholder values (such as <strong>'*'</strong>). You <strong>cannot submit</strong> your education details until you click <strong>Edit</strong> (<i class="fas fa-edit"></i>) on each flagged record and select valid qualifications, college/school, university, and passing year.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="small text-danger font-weight-bold mt-2 pl-4">
+                        <ul class="mb-0 pl-3">
+                            <asp:Literal ID="litDraftIncompleteDetails" runat="server"></asp:Literal>
+                        </ul>
                     </div>
                 </div>
             </asp:PlaceHolder>
@@ -247,32 +283,34 @@
 
                         <asp:TemplateField HeaderText="Stream / Specialization" ItemStyle-Width="160px">
                             <ItemTemplate>
-                                <div class="font-weight-bold text-gray-900"><%# Eval("QUAL_SUB_NAME") %></div>
-                                <div class="small text-muted"><%# Eval("SPECIALIZATION") %></div>
+                                <div class="font-weight-bold text-gray-900"><%# RenderFieldValue(Eval("QUAL_SUB_NAME"), "Stream / Branch") %></div>
+                                <div class="small text-muted"><%# RenderFieldValue(Eval("SPECIALIZATION"), "Specialization") %></div>
                             </ItemTemplate>
                         </asp:TemplateField>
 
-                        <asp:BoundField DataField="YEAR_PASSED" HeaderText="Passing Year" ItemStyle-Width="85px" ItemStyle-HorizontalAlign="Center" HeaderStyle-HorizontalAlign="Center" ItemStyle-Font-Bold="true" />
+                        <asp:TemplateField HeaderText="Passing Year" ItemStyle-Width="85px" ItemStyle-HorizontalAlign="Center" HeaderStyle-HorizontalAlign="Center">
+                            <ItemTemplate>
+                                <%# RenderYearValue(Eval("YEAR_PASSED")) %>
+                            </ItemTemplate>
+                        </asp:TemplateField>
 
                         <asp:TemplateField HeaderText="Institute / University" ItemStyle-Width="200px">
                             <ItemTemplate>
-                                <div class="font-weight-bold text-gray-900"><%# Eval("INSTITUTE_NAME") %></div>
-                                <div class="small text-muted"><%# Eval("COLLEGE_NAME") %></div>
+                                <div class="font-weight-bold text-gray-900"><%# RenderFieldValue(Eval("INSTITUTE_NAME"), "University / Institute") %></div>
+                                <div class="small text-muted"><%# RenderFieldValue(Eval("COLLEGE_NAME"), "College / School") %></div>
                             </ItemTemplate>
                         </asp:TemplateField>
 
-                        <asp:TemplateField HeaderText="Performance" ItemStyle-Width="110px">
+                        <asp:TemplateField HeaderText="Performance" ItemStyle-Width="125px">
                             <ItemTemplate>
-                                <div><strong>Score:</strong> <%# Eval("CGPA_MARKS") %></div>
-                                <div class="small text-muted"><strong>Grade:</strong> <%# Eval("GRADE_DIVISION") %></div>
+                                <div><span class="text-muted small">Score: </span><%# RenderScoreDisplay(Eval("CGPA_MARKS")) %></div>
+                                <div class="small text-muted"><span class="text-muted small">Class: </span><%# RenderFieldValue(Eval("GRADE_DIVISION"), "Grade") %></div>
                             </ItemTemplate>
                         </asp:TemplateField>
 
-                        <asp:TemplateField HeaderText="Status" ItemStyle-Width="105px" ItemStyle-HorizontalAlign="Center" HeaderStyle-HorizontalAlign="Center">
+                        <asp:TemplateField HeaderText="Status" ItemStyle-Width="125px" ItemStyle-HorizontalAlign="Center" HeaderStyle-HorizontalAlign="Center">
                             <ItemTemplate>
-                                <%# Eval("STATUS").ToString() == "Submitted" 
-                                    ? "<span class='badge-status badge-submitted'><i class='fas fa-check-circle mr-1'></i> Submitted</span>" 
-                                    : "<span class='badge-status badge-draft'><i class='fas fa-pencil-alt mr-1'></i> Draft</span>" %>
+                                <%# RenderStatusBadge(Eval("STATUS"), Eval("QUAL_MAIN_CODE"), Eval("QUAL_SUB_CODE"), Eval("YEAR_PASSED"), Eval("INSTITUTE_NAME"), Eval("COLLEGE_NAME"), Eval("SPECIALIZATION"), Eval("CGPA_MARKS"), Eval("GRADE_DIVISION")) %>
                             </ItemTemplate>
                         </asp:TemplateField>
 
@@ -326,22 +364,29 @@
     </div> <!-- Close row -->
 
     <!-- ADD / EDIT QUALIFICATION MODAL FORM -->
-    <asp:Panel ID="pnlModal" runat="server" Visible="false">
-        <div class="custom-modal-backdrop" tabindex="-1" role="dialog">
+    <asp:Panel ID="pnlModal" runat="server" CssClass="custom-modal-backdrop" style="display: none;" tabindex="-1" role="dialog">
             <div class="custom-modal-dialog" role="document">
                 <div class="custom-modal-content">
                     <div class="modal-header bg-light py-3 px-4" style="border-bottom: 1.5px solid #e2e8f0;">
                         <h5 class="modal-title font-weight-bold text-gray-900 mb-0 d-flex align-items-center">
                             <i class="fas fa-graduation-cap text-primary mr-2" style="font-size: 1.25rem;"></i>
-                            <asp:Literal ID="litModalTitle" runat="server">Add Qualification Record</asp:Literal>
+                            <span id="lblModalTitleText"><asp:Literal ID="litModalTitle" runat="server">Add Qualification Record</asp:Literal></span>
                         </h5>
-                        <asp:LinkButton ID="btnCloseModalX" runat="server" CssClass="custom-modal-close" OnClick="btnCloseModal_Click" aria-label="Close" ToolTip="Close dialog">
+                        <asp:LinkButton ID="btnCloseModalX" runat="server" CssClass="custom-modal-close" OnClientClick="EduApp.closeModal(); return false;" OnClick="btnCloseModal_Click" aria-label="Close" ToolTip="Close dialog">
                             &times;
                         </asp:LinkButton>
                     </div>
 
                     <div class="modal-body p-4" style="max-height: calc(85vh - 130px); overflow-y: auto;">
                         <asp:HiddenField ID="hfEditEduId" runat="server" Value="0" />
+                        <asp:HiddenField ID="hfSelectedMainQual" runat="server" />
+                        <asp:HiddenField ID="hfSelectedSubQual" runat="server" />
+
+                        <!-- Client-side instant error banner (0 page reload, immediate focus) -->
+                        <div id="modalClientErrorBanner" class="alert alert-danger py-2 small mb-3" style="display: none;">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                            <span id="modalClientErrorText"></span>
+                        </div>
 
                         <asp:Panel ID="pnlFormError" runat="server" Visible="false" CssClass="alert alert-danger py-2 small mb-3">
                             <i class="fas fa-exclamation-triangle mr-1"></i>
@@ -375,7 +420,8 @@
                             <!-- Specialization / Branch -->
                             <div class="col-md-8 form-group">
                                 <label class="form-label-custom">Specialization / Major Subject <span class="req">*</span></label>
-                                <asp:TextBox ID="txtSpecialization" runat="server" CssClass="form-control form-control-custom" placeholder="e.g. Computer Science, Mechanical Engg, Physics, etc."></asp:TextBox>
+                                <asp:TextBox ID="txtSpecialization" runat="server" CssClass="form-control form-control-custom" placeholder="e.g. Computer Science, Mechanical Engg, or N/A"></asp:TextBox>
+                                <small class="form-text text-muted mt-1"><i class="fas fa-info-circle mr-1 text-primary"></i> Enter branch/major subject, or <strong>N/A</strong> for general/school qualifications.</small>
                             </div>
                         </div>
 
@@ -390,15 +436,32 @@
                             <!-- College Name -->
                             <div class="col-md-6 form-group">
                                 <label class="form-label-custom">College / School Name <span class="req">*</span></label>
-                                <asp:TextBox ID="txtCollegeName" runat="server" CssClass="form-control form-control-custom" placeholder="e.g. University College of Engineering / High School"></asp:TextBox>
+                                <asp:DropDownList ID="ddlCollege" runat="server" CssClass="form-control form-control-custom searchable-select">
+                                </asp:DropDownList>
+                                <asp:Panel ID="pnlCustomCollege" runat="server" CssClass="mt-2" style="display: none;">
+                                    <label class="form-label-custom small text-muted mb-1"><i class="fas fa-pen mr-1"></i> Specify College / School Name: <span class="req">*</span></label>
+                                    <asp:TextBox ID="txtCustomCollege" runat="server" CssClass="form-control form-control-custom" placeholder="e.g. Mangalore Institute of Technology and Engineering (MITE)"></asp:TextBox>
+                                </asp:Panel>
                             </div>
                         </div>
 
                         <div class="row">
-                            <!-- CGPA / Marks / Percentage -->
+                            <!-- Score Type & CGPA / Percentage / Marks -->
                             <div class="col-md-6 form-group">
-                                <label class="form-label-custom">CGPA / Percentage / Marks <span class="req">*</span></label>
-                                <asp:TextBox ID="txtCgpaMarks" runat="server" CssClass="form-control form-control-custom" placeholder="e.g. 8.45 CGPA or 78.50%"></asp:TextBox>
+                                <label class="form-label-custom">Score Type &amp; Value <span class="req">*</span></label>
+                                <div class="input-group">
+                                    <div class="input-group-prepend">
+                                        <asp:DropDownList ID="ddlScoreType" runat="server" CssClass="form-control form-control-custom" style="width: 140px; border-top-right-radius: 0; border-bottom-right-radius: 0; background-color: #f8fafc; font-weight: 600; color: #1e293b;">
+                                            <asp:ListItem Value="Percentage" Selected="True">Percentage (%)</asp:ListItem>
+                                            <asp:ListItem Value="CGPA">CGPA (10 pt)</asp:ListItem>
+                                            <asp:ListItem Value="Marks">Marks / Total</asp:ListItem>
+                                        </asp:DropDownList>
+                                    </div>
+                                    <asp:TextBox ID="txtCgpaMarks" runat="server" CssClass="form-control form-control-custom" placeholder="e.g. 78.50%" style="border-top-left-radius: 0; border-bottom-left-radius: 0;"></asp:TextBox>
+                                </div>
+                                <small class="form-text text-muted mt-1" id="scoreHelpText">
+                                    <i class="fas fa-info-circle mr-1 text-primary"></i> Legacy records may be CGPA or % (e.g. <strong>78.5%</strong> or <strong>8.45 CGPA</strong>).
+                                </small>
                             </div>
 
                             <!-- Grade / Division -->
@@ -443,31 +506,78 @@
 
                     <div class="modal-footer bg-light py-3 px-4 d-flex justify-content-between align-items-center" style="border-top: 1.5px solid #e2e8f0;">
                         <div>
-                            <asp:Button ID="btnCancelModal" runat="server" Text="Cancel" CssClass="btn btn-edu-outline px-3" OnClick="btnCloseModal_Click" />
+                            <asp:Button ID="btnCancelModal" runat="server" Text="Cancel" CssClass="btn btn-edu-outline px-3" OnClientClick="EduApp.closeModal(); return false;" OnClick="btnCloseModal_Click" />
                         </div>
                         <div class="d-flex align-items-center" style="gap: 10px;">
                             <span class="small text-muted mr-1 d-none d-md-inline">
                                 <i class="fas fa-exclamation-circle text-warning mr-1"></i> Once submitted, cannot be edited
                             </span>
-                            <asp:Button ID="btnSaveDraft" runat="server" Text="Save as Draft" CssClass="btn btn-secondary font-weight-bold px-3 shadow-sm" OnClick="btnSaveDraft_Click" ToolTip="Save this qualification as a draft to review, edit, or submit later" />
+                            <asp:Button ID="btnSaveDraft" runat="server" Text="Save as Draft" CssClass="btn btn-secondary font-weight-bold px-3 shadow-sm btn-save-draft" OnClientClick="return EduApp.validateModalForm(false);" OnClick="btnSaveDraft_Click" ToolTip="Save this qualification as a draft to review, edit, or submit later" />
                             <asp:Button ID="btnSaveAndSubmit" runat="server" Text="Save &amp; Submit" CssClass="btn btn-edu-success font-weight-bold px-4 shadow-sm btn-submit-with-caution" OnClick="btnSaveAndSubmit_Click" ToolTip="Save and officially submit this qualification record" />
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
     </asp:Panel>
+        </ContentTemplate>
+    </asp:UpdatePanel>
 </asp:Content>
 
 <asp:Content ID="Content3" ContentPlaceHolderID="ScriptsContent" runat="server">
+    <!-- Embedded Full Sub Qualifications Catalog (Ensures 100% Zero-Loss on Postbacks) -->
+    <script id="subQualDataScript">
+        window.EDU_ALL_SUB_QUALS = <%= GetSubQualsJson() %>;
+    </script>
     <script>
-        $(document).ready(function () {
+        function initEducationUI() {
             if ($('#<%= ddlMainQual.ClientID %>').length > 0) {
                 EduApp.initCascadingDropdowns('<%= ddlMainQual.ClientID %>', '<%= ddlSubQual.ClientID %>');
                 EduApp.makeSearchable('#<%= ddlUniversity.ClientID %>', '-- Search University / Board / Institute --');
+                EduApp.makeSearchable('#<%= ddlCollege.ClientID %>', '-- Search College / School Name --');
                 EduApp.makeSearchable('#<%= ddlYearPassed.ClientID %>', '-- Search Passing Year --');
                 EduApp.makeSearchable('#<%= ddlGrade.ClientID %>', '-- Search Grade / Division --');
+
+                function checkCollegeCustomInput() {
+                    var val = $('#<%= ddlCollege.ClientID %>').val();
+                    if (val === 'OTHER' || (val && val.indexOf('Other') === 0)) {
+                        $('#<%= pnlCustomCollege.ClientID %>').slideDown(150);
+                        $('#<%= txtCustomCollege.ClientID %>').focus();
+                    } else {
+                        $('#<%= pnlCustomCollege.ClientID %>').slideUp(150);
+                    }
+                }
+
+                $('#<%= ddlCollege.ClientID %>').off('change.custom').on('change.custom', function () {
+                    checkCollegeCustomInput();
+                });
+
+                // Initial check in case of existing selection
+                checkCollegeCustomInput();
+
+                // Dynamic placeholder for Score Type (Percentage / CGPA / Marks)
+                $('#<%= ddlScoreType.ClientID %>').off('change.score').on('change.score', function () {
+                    var sType = $(this).val();
+                    var $input = $('#<%= txtCgpaMarks.ClientID %>');
+                    if (sType === 'Percentage') {
+                        $input.attr('placeholder', 'e.g. 78.50%');
+                    } else if (sType === 'CGPA') {
+                        $input.attr('placeholder', 'e.g. 8.45');
+                    } else {
+                        $input.attr('placeholder', 'e.g. 850 / 1000');
+                    }
+                });
             }
+        }
+
+        $(document).ready(function () {
+            initEducationUI();
         });
+
+        // Re-initialize searchable dropdowns and UI seamlessly after every partial AJAX postback
+        if (typeof Sys !== 'undefined' && Sys.WebForms && Sys.WebForms.PageRequestManager) {
+            Sys.WebForms.PageRequestManager.getInstance().add_endRequest(function () {
+                initEducationUI();
+            });
+        }
     </script>
 </asp:Content>

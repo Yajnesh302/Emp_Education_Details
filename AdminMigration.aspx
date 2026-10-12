@@ -53,6 +53,7 @@
                 <div class="small">
                     The import process is strictly non-destructive.
                     It will <strong>never modify, overwrite, or delete</strong> any existing historical records.
+                    Only records whose employee PCNO exists in <code>hrdata.empdetails</code> will be imported.
                 </div>
             </div>
         </div>

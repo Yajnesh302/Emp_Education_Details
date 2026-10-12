@@ -266,6 +266,23 @@ namespace EducationApp.Utils
                             SeedSubjects(conn);
                         }
 
+                        // 6b. Check EDU_COLLEGE
+                        if (!TableExists(conn, "EDU_COLLEGE"))
+                        {
+                            ExecuteSql(conn, @"
+                                CREATE TABLE EDU_COLLEGE (
+                                    COLLEGE_ID NUMBER NOT NULL,
+                                    COLLEGE_NAME VARCHAR2(250) NOT NULL,
+                                    COLLEGE_TYPE VARCHAR2(100),
+                                    LOCATION VARCHAR2(150),
+                                    AFFILIATED_UNIV VARCHAR2(250),
+                                    IS_ACTIVE NUMBER(1) DEFAULT 1 NOT NULL,
+                                    CONSTRAINT PK_EDU_COLLEGE PRIMARY KEY (COLLEGE_ID)
+                                )");
+                            ExecuteSql(conn, "CREATE SEQUENCE SEQ_EDU_COLLEGE START WITH 1000 INCREMENT BY 1 NOCACHE");
+                            SeedColleges(conn);
+                        }
+
                         // 7. Check EDU_QUAL_MAPPING
                         if (!TableExists(conn, "EDU_QUAL_MAPPING"))
                         {
@@ -349,6 +366,29 @@ namespace EducationApp.Utils
                                 )");
                             SeedSampleLegacyEducation(conn);
                         }
+
+                        // 11. Check EMPDETAILS mock table for development if neither EMPDETAILS nor HRDATA.EMPDETAILS exists
+                        if (!TableExists(conn, "EMPDETAILS") && !TableExists(conn, "HRDATA.EMPDETAILS"))
+                        {
+                            try
+                            {
+                                ExecuteSql(conn, @"
+                                    CREATE TABLE EMPDETAILS (
+                                        PCNO VARCHAR2(30) NOT NULL,
+                                        NAME VARCHAR2(100),
+                                        DESIGNATION VARCHAR2(100),
+                                        DIVNAME VARCHAR2(100),
+                                        CONSTRAINT PK_EMPDETAILS PRIMARY KEY (PCNO)
+                                    )");
+                                ExecuteSql(conn, "INSERT INTO EMPDETAILS (PCNO, NAME, DESIGNATION, DIVNAME) VALUES ('1001', 'System Administrator', 'Administrator', 'IT-ADMIN')");
+                                ExecuteSql(conn, "INSERT INTO EMPDETAILS (PCNO, NAME, DESIGNATION, DIVNAME) VALUES ('1002', 'Ramesh Kumar', 'Senior Engineer', 'AERODYNAMICS')");
+                                ExecuteSql(conn, "INSERT INTO EMPDETAILS (PCNO, NAME, DESIGNATION, DIVNAME) VALUES ('1003', 'Priya Sharma', 'Scientist C', 'PROPULSION')");
+                            }
+                            catch { }
+                        }
+
+                        // 12. Ensure Sub Qualifications are mapped to Main Qualifications
+                        EnsureSubQualificationsLinked(conn);
                     }
 
                     _schemaEnsured = true;
@@ -358,6 +398,88 @@ namespace EducationApp.Utils
                     System.Diagnostics.Debug.WriteLine("EnsureSchema Warning: " + ex.Message);
                     _schemaEnsured = true; // allow app to continue
                 }
+            }
+        }
+
+        private static void EnsureSubQualificationsLinked(OracleConnection conn)
+        {
+            try
+            {
+                if (!TableExists(conn, "EDU_QUAL_SUB")) return;
+
+                using (OracleCommand chkCmd = new OracleCommand("SELECT COUNT(*) FROM EDU_QUAL_SUB WHERE MAIN_QUAL_CODE IS NULL AND SUB_CODE NOT IN ('NA', 'OTHER', 'GENERAL')", conn))
+                {
+                    object unlinkedObj = chkCmd.ExecuteScalar();
+                    int unlinked = unlinkedObj != null && unlinkedObj != DBNull.Value ? Convert.ToInt32(unlinkedObj) : 0;
+                    if (unlinked == 0) return;
+                }
+
+                string[] linkStatements = new string[]
+                {
+                    "UPDATE EDU_QUAL_SUB SET MAIN_QUAL_CODE = 'BE' WHERE MAIN_QUAL_CODE IS NULL AND SUB_CODE IN ('CIVIL', 'DMECH', 'COMPE', 'COMPS', 'ELCL', 'E&C', 'ELECT', 'INDST', 'INSTR', 'AERO', 'AUTO', 'CHEMI', 'NANO', 'RACE', 'ADEL', 'ADMT', 'ANMT', 'APH', 'APE', 'APO', 'ARAN', 'CREO', 'CTSP', 'CSYG', 'DENGG', 'DEMQ', 'DSCE', 'AENGG', 'ELTE', 'FLM', 'GAST', 'GUIM', 'GUIW', 'HEPEN', 'INCS', 'INEC', 'INOP', 'LEOE', 'MCDY', 'MACDE', 'MRENG', 'MIELE', 'OEAOC', 'POE', 'PRENG', 'REBTE', 'SOSTA', 'SPER', 'SIT', 'SYSCO', 'SYSSO', 'TELES', 'THERE', 'TODE', 'TOOEN', 'WELTE', 'COMME', 'ELINS', 'SEFEG', 'GENENG', 'AI', 'AM', 'AROSE', 'AUTMO', 'AVONI', 'DSP', 'EE', 'IM', 'INDE', 'INSSP', 'IS', 'IT', 'M&S', 'MAREN', 'MATEC', 'MD', 'METAL', 'MME', 'MSD', 'NARCH', 'PLEN', 'RFM', 'TEXTL')",
+                    "UPDATE EDU_QUAL_SUB SET MAIN_QUAL_CODE = 'BSC' WHERE MAIN_QUAL_CODE IS NULL AND SUB_CODE IN ('PHY', 'CHEM', 'MATH', 'BOT', 'ZOO', 'STATS', 'BIO', 'BIOT', 'BICHM', 'GENSC', 'ENV', 'MICBIO', 'MATSC', 'GEOL', 'AGRSC', 'INDM', 'NPHYS', 'OCGG', 'ORACH', 'PHRCH', 'PHYIN', 'PHYME', 'PLBRE', 'PEMLL', 'AG', 'BP', 'FSAT', 'HG', 'HORT', 'MIBIO', 'OPERA', 'POUSC')",
+                    "UPDATE EDU_QUAL_SUB SET MAIN_QUAL_CODE = 'BA' WHERE MAIN_QUAL_CODE IS NULL AND SUB_CODE IN ('ENG', 'HND', 'HST', 'ECO', 'POL', 'SOCIO', 'PSY', 'PHIL', 'GEO', 'SS', 'HS', 'PAD', 'TRANS', 'JY', 'AP', 'HP', 'BLIB', 'DSST', 'SRD')",
+                    "UPDATE EDU_QUAL_SUB SET MAIN_QUAL_CODE = 'BCOM' WHERE MAIN_QUAL_CODE IS NULL AND SUB_CODE IN ('COM', 'ACC', 'FINAN', 'ACF')",
+                    "UPDATE EDU_QUAL_SUB SET MAIN_QUAL_CODE = 'BBA' WHERE MAIN_QUAL_CODE IS NULL AND SUB_CODE IN ('HMCT')",
+                    "UPDATE EDU_QUAL_SUB SET MAIN_QUAL_CODE = 'MBA' WHERE MAIN_QUAL_CODE IS NULL AND SUB_CODE IN ('MANG', 'HR', 'MARKT', 'PM', 'TECHM', 'MM')",
+                    "UPDATE EDU_QUAL_SUB SET MAIN_QUAL_CODE = 'ITI' WHERE MAIN_QUAL_CODE IS NULL AND SUB_CODE IN ('FIT', 'TUR', 'MEC', 'WEL', 'EL', 'CR', 'DM', 'SMW', 'COPA', 'P', 'BB', 'AC', 'DTP', 'DR(M)', 'DPHG', 'PHG')",
+                    "UPDATE EDU_QUAL_SUB SET MAIN_QUAL_CODE = 'DENG' WHERE MAIN_QUAL_CODE IS NULL AND SUB_CODE IN ('DCHEM')",
+                    "UPDATE EDU_QUAL_SUB SET MAIN_QUAL_CODE = 'MCA' WHERE MAIN_QUAL_CODE IS NULL AND SUB_CODE IN ('CA', 'SOFTE', 'SS1')",
+                    "UPDATE EDU_QUAL_SUB SET MAIN_QUAL_CODE = 'MBBS' WHERE MAIN_QUAL_CODE IS NULL AND SUB_CODE IN ('MED', 'CP', 'PHYL', 'MBC', 'BIOMD', 'DEN', 'VET')",
+                    "UPDATE EDU_QUAL_SUB SET MAIN_QUAL_CODE = 'LLB' WHERE MAIN_QUAL_CODE IS NULL AND SUB_CODE IN ('LAW', 'IPR')"
+                };
+
+                foreach (string sql in linkStatements)
+                {
+                    try
+                    {
+                        ExecuteSql(conn, sql);
+                    }
+                    catch { }
+                }
+
+                try
+                {
+                    ExecuteSql(conn, @"
+                        INSERT INTO EDU_QUAL_SUB (MAIN_QUAL_CODE, SUB_CODE, SUB_NAME, IS_ACTIVE)
+                        SELECT 'BTECH', SUB_CODE, SUB_NAME, 1
+                        FROM EDU_QUAL_SUB
+                        WHERE MAIN_QUAL_CODE = 'BE'
+                          AND SUB_CODE NOT IN (SELECT SUB_CODE FROM EDU_QUAL_SUB WHERE MAIN_QUAL_CODE = 'BTECH')");
+
+                    ExecuteSql(conn, @"
+                        INSERT INTO EDU_QUAL_SUB (MAIN_QUAL_CODE, SUB_CODE, SUB_NAME, IS_ACTIVE)
+                        SELECT 'B.E', SUB_CODE, SUB_NAME, 1
+                        FROM EDU_QUAL_SUB
+                        WHERE MAIN_QUAL_CODE = 'BE'
+                          AND SUB_CODE NOT IN (SELECT SUB_CODE FROM EDU_QUAL_SUB WHERE MAIN_QUAL_CODE = 'B.E')");
+
+                    ExecuteSql(conn, @"
+                        INSERT INTO EDU_QUAL_SUB (MAIN_QUAL_CODE, SUB_CODE, SUB_NAME, IS_ACTIVE)
+                        SELECT 'B.TECH', SUB_CODE, SUB_NAME, 1
+                        FROM EDU_QUAL_SUB
+                        WHERE MAIN_QUAL_CODE IN ('BTECH', 'BE')
+                          AND SUB_CODE NOT IN (SELECT SUB_CODE FROM EDU_QUAL_SUB WHERE MAIN_QUAL_CODE = 'B.TECH')");
+
+                    ExecuteSql(conn, @"
+                        INSERT INTO EDU_QUAL_SUB (MAIN_QUAL_CODE, SUB_CODE, SUB_NAME, IS_ACTIVE)
+                        SELECT 'M.E', SUB_CODE, SUB_NAME, 1
+                        FROM EDU_QUAL_SUB
+                        WHERE MAIN_QUAL_CODE = 'ME'
+                          AND SUB_CODE NOT IN (SELECT SUB_CODE FROM EDU_QUAL_SUB WHERE MAIN_QUAL_CODE = 'M.E')");
+
+                    ExecuteSql(conn, @"
+                        INSERT INTO EDU_QUAL_SUB (MAIN_QUAL_CODE, SUB_CODE, SUB_NAME, IS_ACTIVE)
+                        SELECT 'M.TECH', SUB_CODE, SUB_NAME, 1
+                        FROM EDU_QUAL_SUB
+                        WHERE MAIN_QUAL_CODE IN ('MTECH', 'ME')
+                          AND SUB_CODE NOT IN (SELECT SUB_CODE FROM EDU_QUAL_SUB WHERE MAIN_QUAL_CODE = 'M.TECH')");
+                }
+                catch { }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("EnsureSubQualificationsLinked: " + ex.Message);
             }
         }
 
@@ -636,39 +758,101 @@ namespace EducationApp.Utils
         {
             string[] univs = new string[]
             {
-                "1|Anna University",
-                "2|Bangalore University",
-                "3|Andhra University",
-                "4|IIT Kanpur",
-                "5|IIT Madras",
-                "6|IIT Delhi",
-                "7|IISc, Bangalore",
-                "11|Benaras Hindu University",
-                "12|BITS, Pilani",
-                "13|IIT, Kharagpur",
-                "14|NIT, Warangal (REC)",
-                "16|NIT, Surathkal (KREC)",
-                "20|Karnataka University",
-                "21|Mysore University",
-                "22|Mangalore University",
-                "23|Kuvempu University",
-                "28|Osmania University",
-                "45|Delhi University",
-                "48|Kerala University",
-                "56|IIT Bombay",
-                "129|Visvesvaraya Technological University (VTU), Belgaum",
-                "160|CBSE Board",
-                "166|KSEEB (Karnataka Secondary Education Board)",
-                "167|PUE (Department of Pre-University Education)",
-                "188|IIT Kharagpur",
-                "221|CBSE Board New Delhi",
-                "235|State SSC Board",
-                "236|State Intermediate Board",
-                "241|Karnataka State Board",
-                "248|IGNOU, New Delhi",
-                "264|JNTU, Hyderabad",
-                "340|ICSE / ISC Board",
-                "350|Other Recognized University / Board"
+                "1|Anna University, Chennai",
+                "2|Bangalore University, Bengaluru",
+                "3|Andhra University, Visakhapatnam",
+                "4|Indian Institute of Technology (IIT), Kanpur",
+                "5|Indian Institute of Technology (IIT), Madras",
+                "6|Indian Institute of Technology (IIT), Delhi",
+                "7|Indian Institute of Science (IISc), Bangalore",
+                "9|Indian Institute of Technology (IIT), Guwahati",
+                "10|Indian Institute of Technology (IIT), Roorkee",
+                "11|Banaras Hindu University (BHU), Varanasi",
+                "12|Birla Institute of Technology and Science (BITS), Pilani",
+                "13|Indian Institute of Technology (IIT), Kharagpur",
+                "14|National Institute of Technology (NIT / REC), Warangal",
+                "15|National Institute of Technology (NIT / REC), Tiruchirappalli",
+                "16|National Institute of Technology Karnataka (NITK / REC), Surathkal",
+                "17|National Institute of Technology (NIT / REC), Calicut",
+                "18|National Institute of Technology (NIT / REC), Silchar",
+                "19|Malaviya National Institute of Technology (MNIT), Jaipur",
+                "20|Karnatak University, Dharwad",
+                "21|University of Mysore, Mysuru",
+                "22|Mangalore University, Konaje",
+                "23|Kuvempu University, Shankaraghatta, Shivamogga",
+                "25|Jawaharlal Nehru Technological University Kakinada (JNTUK)",
+                "26|Jawaharlal Nehru Technological University Anantapur (JNTUA)",
+                "27|Acharya Nagarjuna University, Guntur",
+                "28|Osmania University, Hyderabad",
+                "30|University of Hyderabad (UoH / Central University), Hyderabad",
+                "33|University of Madras, Chennai",
+                "38|Cochin University of Science and Technology (CUSAT), Kochi",
+                "40|Maulana Azad National Institute of Technology (MANIT), Bhopal",
+                "43|Madurai Kamaraj University (MKU), Madurai",
+                "44|Jawaharlal Nehru University (JNU), New Delhi",
+                "45|University of Delhi (DU), New Delhi",
+                "48|University of Kerala, Thiruvananthapuram",
+                "49|National Institute of Technology (NIT / REC), Hamirpur",
+                "50|Mahatma Gandhi University, Kerala",
+                "51|Sardar Vallabhbhai National Institute of Technology (SVNIT), Surat",
+                "55|Rajiv Gandhi Proudyogiki Vishwavidyalaya (RGPV), Bhopal",
+                "56|Indian Institute of Technology (IIT), Bombay",
+                "61|Utkal University, Bhubaneswar",
+                "65|University of Calicut, Malappuram",
+                "68|Motilal Nehru National Institute of Technology (MNNIT), Allahabad",
+                "71|Savitribai Phule Pune University (SPPU / University of Pune)",
+                "73|University of Calcutta (Calcutta University), Kolkata",
+                "74|Deen Dayal Upadhyaya Gorakhpur University (DDU), Gorakhpur",
+                "78|University of Lucknow, Lucknow",
+                "84|Aligarh Muslim University (AMU), Aligarh",
+                "86|National Institute of Technology (NIT / REC), Rourkela",
+                "89|Indira Gandhi National Open University (IGNOU), New Delhi",
+                "95|National Institute of Technology (NIT / REC), Durgapur",
+                "96|Mahatma Jyotiba Phule Rohilkhand University (MJPRU), Bareilly",
+                "102|Dr. B. R. Ambedkar National Institute of Technology (NIT), Jalandhar",
+                "103|Jamia Millia Islamia (JMI), New Delhi",
+                "109|Panjab University, Chandigarh",
+                "119|North-Eastern Hill University (NEHU), Shillong",
+                "125|Patna University, Patna",
+                "129|Visvesvaraya Technological University (VTU), Belagavi",
+                "140|National Institute of Technology (NIT), Jamshedpur",
+                "146|National Institute of Technology (NIT), Kurukshetra",
+                "151|ABV-Indian Institute of Information Technology and Management (ABV-IIITM), Gwalior",
+                "156|National Institute of Technology (NIT), Raipur",
+                "158|National Institute of Technology (NIT), Patna",
+                "163|Indian Institute of Information Technology (IIIT), Allahabad",
+                "166|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "167|Department of Pre-University Education (PUE), Karnataka",
+                "172|West Bengal Board of Secondary Education (WBBSE)",
+                "173|West Bengal Council of Higher Secondary Education (WBCHSE)",
+                "181|State Board of Technical Education and Training (SBTET), Tamil Nadu",
+                "204|Bihar School Examination Board (BSEB), Patna",
+                "219|West Bengal State Council of Technical and Vocational Education (WBSCTE), Kolkata",
+                "221|Central Board of Secondary Education (CBSE), New Delhi",
+                "223|Indian Institute of Technology (IIT), Gandhinagar",
+                "226|Indian Institute of Technology (IIT), Patna",
+                "264|Jawaharlal Nehru Technological University (JNTU), Hyderabad",
+                "274|National Council for Vocational Training (NCVT)",
+                "275|Indian Institute of Technology (IIT), Jodhpur",
+                "278|Indian Institute of Management (IIM), Lucknow",
+                "281|Central University of Rajasthan, Ajmer",
+                "283|National Institute of Technology (NIT), Agartala",
+                "284|Dr. A.P.J. Abdul Kalam Technical University (AKTU / UPTU), Lucknow",
+                "289|Indian Institute of Technology (IIT), Indore",
+                "290|National Institute of Technology (NIT), Delhi",
+                "297|Maharashtra State Board of Secondary and Higher Secondary Education (MSBSHSE)",
+                "298|National Institute of Technology (NIT), Srinagar",
+                "304|Board of Secondary Education, Assam (SEBA)",
+                "307|Indian Institute of Technology (IIT), Hyderabad",
+                "310|Indian Institute of Technology (IIT), Mandi",
+                "323|Indian Institute of Technology (BHU), Varanasi",
+                "325|Indian Institute of Technology (IIT), Ropar",
+                "338|Indian Institute of Technology (IIT), Bhubaneswar",
+                "340|Council for the Indian School Certificate Examinations (CISCE / ICSE / ISC)",
+                "342|Uttarakhand Board of Technical Education, Roorkee (UBTER)",
+                "344|Assam Higher Secondary Education Council (AHSEC)",
+                "549|Mangalore Institute of Technology and Engineering (MITE), Moodabidri",
+                "550|Other Recognized University / Board"
             };
 
             foreach (var u in univs)
@@ -717,6 +901,151 @@ namespace EducationApp.Utils
                     cmd.Parameters.Add(new OracleParameter("ID", Convert.ToInt32(p[0])));
                     cmd.Parameters.Add(new OracleParameter("NAME", p[1]));
                     cmd.Parameters.Add(new OracleParameter("GRP", p[2]));
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        private static void SeedColleges(OracleConnection conn)
+        {
+            string[] colleges = new string[]
+            {
+                "1|Mangalore Institute of Technology and Engineering (MITE), Moodabidri|Engineering College|Moodabidri / Mangaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "2|RV College of Engineering (RVCE), Bengaluru|Engineering College|Bengaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "3|BMS College of Engineering (BMSCE), Bengaluru|Engineering College|Bengaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "4|M.S. Ramaiah Institute of Technology (MSRIT), Bengaluru|Engineering College|Bengaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "5|PES Institute of Technology / PES University, Bengaluru|Engineering College|Bengaluru|PES University, Bengaluru",
+                "6|Bangalore Institute of Technology (BIT), Bengaluru|Engineering College|Bengaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "7|Dayananda Sagar College of Engineering (DSCE), Bengaluru|Engineering College|Bengaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "8|Sir M. Visvesvaraya Institute of Technology (SMVIT), Bengaluru|Engineering College|Bengaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "9|Siddaganga Institute of Technology (SIT), Tumakuru|Engineering College|Tumakuru|Visvesvaraya Technological University (VTU), Belagavi",
+                "10|The National Institute of Engineering (NIE), Mysuru|Engineering College|Mysuru|Visvesvaraya Technological University (VTU), Belagavi",
+                "11|Sri Jayachamarajendra College of Engineering (SJCE), Mysuru|Engineering College|Mysuru|JSS Science and Technology University",
+                "12|NMAM Institute of Technology (NMAMIT), Nitte|Engineering College|Nitte / Karkala|Nitte (Deemed to be University)",
+                "13|Canara Engineering College (CEC), Benjanapadavu, Mangaluru|Engineering College|Mangaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "14|St. Joseph Engineering College (SJEC), Vamanjoor, Mangaluru|Engineering College|Mangaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "15|Sahyadri College of Engineering & Management, Adyar, Mangaluru|Engineering College|Mangaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "16|P.A. College of Engineering (PACE), Mangaluru|Engineering College|Mangaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "17|Srinivas Institute of Technology (SIT), Valachil, Mangaluru|Engineering College|Mangaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "18|Bearys Institute of Technology (BIT), Mangaluru|Engineering College|Mangaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "19|Alva's Institute of Engineering & Technology (AIET), Moodabidri|Engineering College|Moodabidri|Visvesvaraya Technological University (VTU), Belagavi",
+                "20|Shri Madhwa Vadiraja Institute of Technology & Management (SMVITM), Bantakal|Engineering College|Udupi|Visvesvaraya Technological University (VTU), Belagavi",
+                "21|B.N.M. Institute of Technology (BNMIT), Bengaluru|Engineering College|Bengaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "22|RNS Institute of Technology (RNSIT), Bengaluru|Engineering College|Bengaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "23|JSS Academy of Technical Education (JSSATE), Bengaluru|Engineering College|Bengaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "24|New Horizon College of Engineering (NHCE), Bengaluru|Engineering College|Bengaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "25|CMR Institute of Technology (CMRIT), Bengaluru|Engineering College|Bengaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "26|The Oxford College of Engineering, Bengaluru|Engineering College|Bengaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "27|Nitte Meenakshi Institute of Technology (NMIT), Bengaluru|Engineering College|Bengaluru|Visvesvaraya Technological University (VTU), Belagavi",
+                "28|KLE Technological University / BVB College of Engineering, Hubballi|Engineering College|Hubballi|KLE Technological University",
+                "29|Basaveshwar Engineering College (BEC), Bagalkot|Engineering College|Bagalkot|Visvesvaraya Technological University (VTU), Belagavi",
+                "30|SDM College of Engineering and Technology (SDMCET), Dharwad|Engineering College|Dharwad|Visvesvaraya Technological University (VTU), Belagavi",
+                "31|Malnad College of Engineering (MCE), Hassan|Engineering College|Hassan|Visvesvaraya Technological University (VTU), Belagavi",
+                "32|Bapuji Institute of Engineering and Technology (BIET), Davangere|Engineering College|Davangere|Visvesvaraya Technological University (VTU), Belagavi",
+                "33|University Visvesvaraya College of Engineering (UVCE), Bengaluru|Engineering College|Bengaluru|Bangalore University, Bengaluru",
+                "34|College of Engineering, Pune (COEP)|Engineering College|Pune|Savitribai Phule Pune University (SPPU / University of Pune)",
+                "35|Veermata Jijabai Technological Institute (VJTI), Mumbai|Engineering College|Mumbai|University of Mumbai (Mumbai University)",
+                "36|College of Engineering, Guindy (CEG), Anna University, Chennai|Engineering College|Chennai|Anna University, Chennai",
+                "37|PSG College of Technology, Coimbatore|Engineering College|Coimbatore|Anna University, Chennai",
+                "38|Thapar Institute of Engineering and Technology, Patiala|Engineering College|Patiala|Thapar Institute of Engineering and Technology",
+                "39|Birla Institute of Technology (BIT), Mesra, Ranchi|Engineering College|Ranchi|BIT Mesra",
+                "40|Manipal Institute of Technology (MIT), Manipal|Engineering College|Manipal|Manipal Academy of Higher Education (MAHE)",
+                "41|St. Aloysius College (Autonomous), Mangaluru|Degree / Autonomous College|Mangaluru|Mangalore University, Konaje",
+                "42|St. Agnes College (Autonomous), Mangaluru|Degree / Autonomous College|Mangaluru|Mangalore University, Konaje",
+                "43|Canara College, Mangaluru|Degree College|Mangaluru|Mangalore University, Konaje",
+                "44|SDM College (Autonomous), Ujire|Degree / Autonomous College|Ujire|Mangalore University, Konaje",
+                "45|Bhandarkars' Arts & Science College, Kundapura|Degree College|Kundapura|Mangalore University, Konaje",
+                "46|Poornaprajna College (PPC), Udupi|Degree College|Udupi|Mangalore University, Konaje",
+                "47|Mahatma Gandhi Memorial College (MGM), Udupi|Degree College|Udupi|Mangalore University, Konaje",
+                "48|St. Joseph's University / College, Bengaluru|Degree / Autonomous College|Bengaluru|Bangalore University, Bengaluru",
+                "49|Mount Carmel College (MCC), Bengaluru|Degree / Autonomous College|Bengaluru|Bengaluru City University",
+                "50|National College, Basavanagudi, Bengaluru|Degree / Autonomous College|Bengaluru|Bangalore University, Bengaluru",
+                "51|Canara Pre-University College, Mangaluru|PU College / Higher Secondary|Mangaluru|Department of Pre-University Education (PUE), Karnataka",
+                "52|St. Aloysius Pre-University College, Mangaluru|PU College / Higher Secondary|Mangaluru|Department of Pre-University Education (PUE), Karnataka",
+                "53|Expert Pre-University College, Mangaluru|PU College / Higher Secondary|Mangaluru|Department of Pre-University Education (PUE), Karnataka",
+                "54|Sharada Pre-University College, Mangaluru|PU College / Higher Secondary|Mangaluru|Department of Pre-University Education (PUE), Karnataka",
+                "55|Alva's Pre-University College, Moodabidri|PU College / Higher Secondary|Moodabidri|Department of Pre-University Education (PUE), Karnataka",
+                "56|National Pre-University College, Bengaluru|PU College / Higher Secondary|Bengaluru|Department of Pre-University Education (PUE), Karnataka",
+                "57|Kendriya Vidyalaya (KV)|Senior Secondary School|All India|Central Board of Secondary Education (CBSE), New Delhi",
+                "58|Delhi Public School (DPS)|Senior Secondary School|All India|Central Board of Secondary Education (CBSE), New Delhi",
+                "59|Karnataka (Govt) Polytechnic (KPT), Mangaluru|Polytechnic / Diploma|Mangaluru|Department of Technical Education (DTE), Karnataka",
+                "60|Govt ITI College / Industrial Training Institute|Vocational / ITI|State / Central|National Council for Vocational Training (NCVT)",
+                "61|Government High School (State Board)|High School / Secondary|Karnataka / State Board|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "62|National High School, Basavanagudi, Bengaluru|High School / Secondary|Bengaluru|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "63|St. Joseph High School / Boys' High School|High School / Secondary|Bengaluru / Karnataka|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "64|Govt High School|High School / Secondary|State Board|State Secondary School Board",
+                "65|Bangalore High School (BHS), Bengaluru|High School / Secondary|Bengaluru|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "66|St. Germain High School, Bengaluru|High School / Secondary|Bengaluru|Council for the Indian School Certificate Examinations (CISCE / ICSE / ISC)",
+                "67|Bishop Cotton Boys' / Girls' School, Bengaluru|Senior Secondary School|Bengaluru|Council for the Indian School Certificate Examinations (CISCE / ICSE / ISC)",
+                "68|Baldwin Boys' / Girls' High School, Bengaluru|Senior Secondary School|Bengaluru|Council for the Indian School Certificate Examinations (CISCE / ICSE / ISC)",
+                "69|Cluny Convent High School, Bengaluru|High School / Secondary|Bengaluru|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "70|Sophia High School, Bengaluru|Senior Secondary School|Bengaluru|Council for the Indian School Certificate Examinations (CISCE / ICSE / ISC)",
+                "71|Sacred Heart Girls' High School, Bengaluru|High School / Secondary|Bengaluru|Council for the Indian School Certificate Examinations (CISCE / ICSE / ISC)",
+                "72|Sri Kumaran Children's Home, Bengaluru|Senior Secondary School|Bengaluru|Central Board of Secondary Education (CBSE), New Delhi",
+                "73|National Public School (NPS), Bengaluru / India|Senior Secondary School|Bengaluru / Pan-India|Central Board of Secondary Education (CBSE), New Delhi",
+                "74|The Frank Anthony Public School (FAPS), Bengaluru|Senior Secondary School|Bengaluru|Council for the Indian School Certificate Examinations (CISCE / ICSE / ISC)",
+                "75|Marimallappa's High School & PU College, Mysuru|High School / PU College|Mysuru|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "76|Sadvidya Composite High School & PU College, Mysuru|High School / PU College|Mysuru|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "77|Sarada Vilas High School, Mysuru|High School / Secondary|Mysuru|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "78|Demonstration Multipurpose School (DMS / RIE), Mysuru|Senior Secondary School|Mysuru|Central Board of Secondary Education (CBSE), New Delhi",
+                "79|Canara High School (Main / Urwa), Mangaluru|High School / Secondary|Mangaluru|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "80|St. Aloysius High School, Mangaluru|High School / Secondary|Mangaluru|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "81|Sharada Vidyalaya, Mangaluru|Senior Secondary School|Mangaluru|Central Board of Secondary Education (CBSE), New Delhi",
+                "82|St. Ann's High School, Mangaluru|High School / Secondary|Mangaluru|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "83|Rosario High School, Mangaluru|High School / Secondary|Mangaluru|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "84|Milagres High School, Mangaluru|High School / Secondary|Mangaluru|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "85|BEM High School, Mangaluru|High School / Secondary|Mangaluru|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "86|Alva's High School, Moodabidri|High School / Secondary|Moodabidri|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "87|Jain High School & PU College, Moodabidri|High School / PU College|Moodabidri|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "88|Rotary English Medium School, Moodabidri|High School / Secondary|Moodabidri|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "89|Poornaprajna High School, Udupi|High School / Secondary|Udupi|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "90|Christian High School, Udupi|High School / Secondary|Udupi|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "91|Karnatak High School, Dharwad|High School / Secondary|Dharwad|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "92|Basel Mission High School, Dharwad|High School / Secondary|Dharwad|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "93|RLS High School, Dharwad|High School / Secondary|Dharwad|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "94|St. Paul's High School, Belagavi|High School / Secondary|Belagavi|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "95|Beynon Smith High School, Belagavi|High School / Secondary|Belagavi|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "96|Vanita Vidyalaya High School, Belagavi|High School / Secondary|Belagavi|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
+                "97|Jawahar Navodaya Vidyalaya (JNV)|Senior Secondary School|All India / District Level|Central Board of Secondary Education (CBSE), New Delhi",
+                "98|Sainik School|Senior Secondary School|All India|Central Board of Secondary Education (CBSE), New Delhi",
+                "99|Rashtriya Military School (RMS)|Senior Secondary School|All India|Central Board of Secondary Education (CBSE), New Delhi",
+                "100|Army Public School (APS)|Senior Secondary School|All India / Military Cantonments|Central Board of Secondary Education (CBSE), New Delhi",
+                "101|Air Force School|Senior Secondary School|All India / AFS Bases|Central Board of Secondary Education (CBSE), New Delhi",
+                "102|Navy Children School (NCS)|Senior Secondary School|All India / Naval Bases|Central Board of Secondary Education (CBSE), New Delhi",
+                "103|Atomic Energy Central School (AECS)|Senior Secondary School|All India / DAE Centers|Central Board of Secondary Education (CBSE), New Delhi",
+                "104|DAV Public School|Senior Secondary School|All India|Central Board of Secondary Education (CBSE), New Delhi",
+                "105|Chinmaya Vidyalaya|Senior Secondary School|All India|Central Board of Secondary Education (CBSE), New Delhi",
+                "106|Bharatiya Vidya Bhavan (BVB) School|Senior Secondary School|All India|Central Board of Secondary Education (CBSE), New Delhi",
+                "107|Ryan International School|Senior Secondary School|All India|Central Board of Secondary Education (CBSE), New Delhi",
+                "108|Don Bosco High School|High School / Secondary|All India|State Board / ICSE / CBSE",
+                "109|Government Model Higher Primary School|Primary / Middle School|State Board|Department of School Education",
+                "110|Government Pre-University College (State PU Board)|PU College / Higher Secondary|Karnataka / State|Department of Pre-University Education (PUE), Karnataka",
+                "111|Zilla Parishad High School (ZPHS)|High School / Secondary|State Board|Board of Secondary Education",
+                "112|Municipal / Corporation High School|High School / Secondary|City / Municipal|State Secondary Board",
+                "113|Morarji Desai Residential School (MDRS)|High School / Secondary|Karnataka|Karnataka Residential Educational Institutions Society (KREIS)",
+                "114|Kittur Rani Channamma Residential School|High School / Secondary|Karnataka|Karnataka Residential Educational Institutions Society (KREIS)",
+                "115|Eklavya Model Residential School (EMRS)|Senior Secondary School|All India / Tribal Affairs|Central Board of Secondary Education (CBSE), New Delhi",
+                "116|St. Mary's High School|High School / Secondary|State / Central|State Board / CBSE / ICSE",
+                "117|St. Xavier's High School|High School / Secondary|State / Central|State Board / CBSE / ICSE",
+                "118|St. Francis High School|High School / Secondary|State / Central|State Board / CBSE / ICSE",
+                "119|Holy Cross High School|High School / Secondary|State / Central|State Board / CBSE / ICSE",
+                "120|Convent / Missionary High School|High School / Secondary|State / Central|State Board / ICSE / CBSE",
+                "121|Private Aided High School|High School / Secondary|State Board|State Secondary Education Board",
+                "122|Private Unaided / CBSE / ICSE School|Senior Secondary School|CBSE / ICSE / State|CBSE / CISCE / State Board"
+            };
+
+            foreach (var c in colleges)
+            {
+                var p = c.Split('|');
+                using (OracleCommand cmd = new OracleCommand(@"
+                    INSERT INTO EDU_COLLEGE (COLLEGE_ID, COLLEGE_NAME, COLLEGE_TYPE, LOCATION, AFFILIATED_UNIV, IS_ACTIVE) 
+                    VALUES (:ID, :NAME, :TYPE, :LOC, :UNIV, 1)", conn))
+                {
+                    cmd.Parameters.Add(new OracleParameter("ID", Convert.ToInt32(p[0])));
+                    cmd.Parameters.Add(new OracleParameter("NAME", p[1]));
+                    cmd.Parameters.Add(new OracleParameter("TYPE", p[2]));
+                    cmd.Parameters.Add(new OracleParameter("LOC", p[3]));
+                    cmd.Parameters.Add(new OracleParameter("UNIV", p[4]));
                     cmd.ExecuteNonQuery();
                 }
             }
@@ -852,6 +1181,54 @@ namespace EducationApp.Utils
             }
         }
 
+        /// <summary>
+        /// Checks whether the given PCNO exists in the master hrdata.empdetails table (or fallback empdetails).
+        /// Returns true and outputs employee details if found; returns false otherwise.
+        /// </summary>
+        public static bool CheckEmployeeExistsInHrData(string pcno, out string empName, out string designation, out string division)
+        {
+            empName = null;
+            designation = "";
+            division = "";
+
+            if (string.IsNullOrWhiteSpace(pcno))
+                return false;
+
+            string cleanPcno = pcno.Trim();
+
+            // 1. Try HRDATA.EMPDETAILS first
+            try
+            {
+                string query = "SELECT PCNO, NAME, DESIGNATION, DIVNAME FROM HRDATA.EMPDETAILS WHERE TRIM(PCNO) = :PCNO AND ROWNUM <= 1";
+                DataTable dt = ExecuteQuery(query, new OracleParameter("PCNO", cleanPcno));
+                if (dt != null && dt.Rows.Count > 0)
+                {
+                    empName = dt.Rows[0]["NAME"] != DBNull.Value ? dt.Rows[0]["NAME"].ToString() : ("Employee " + cleanPcno);
+                    designation = dt.Rows[0]["DESIGNATION"] != DBNull.Value ? dt.Rows[0]["DESIGNATION"].ToString() : "";
+                    division = dt.Rows[0]["DIVNAME"] != DBNull.Value ? dt.Rows[0]["DIVNAME"].ToString() : "";
+                    return true;
+                }
+            }
+            catch { }
+
+            // 2. Try SYSTEM.EMPDETAILS / local EMPDETAILS
+            try
+            {
+                string query = "SELECT PCNO, NAME, DESIGNATION, DIVNAME FROM EMPDETAILS WHERE TRIM(PCNO) = :PCNO AND ROWNUM <= 1";
+                DataTable dt = ExecuteQuery(query, new OracleParameter("PCNO", cleanPcno));
+                if (dt != null && dt.Rows.Count > 0)
+                {
+                    empName = dt.Rows[0]["NAME"] != DBNull.Value ? dt.Rows[0]["NAME"].ToString() : ("Employee " + cleanPcno);
+                    designation = dt.Rows[0]["DESIGNATION"] != DBNull.Value ? dt.Rows[0]["DESIGNATION"].ToString() : "";
+                    division = dt.Rows[0]["DIVNAME"] != DBNull.Value ? dt.Rows[0]["DIVNAME"].ToString() : "";
+                    return true;
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
         public static DataRow GetEmployeeProfile(string pcno)
         {
             if (string.IsNullOrEmpty(pcno)) return null;
@@ -859,7 +1236,7 @@ namespace EducationApp.Utils
             // Try HRDATA.EMPDETAILS first
             try
             {
-                string query = "SELECT PCNO, NAME, DESIGNATION, DIVNAME FROM HRDATA.EMPDETAILS WHERE PCNO = :PCNO AND ROWNUM <= 1";
+                string query = "SELECT PCNO, NAME, DESIGNATION, DIVNAME FROM HRDATA.EMPDETAILS WHERE TRIM(PCNO) = :PCNO AND ROWNUM <= 1";
                 DataTable dt = ExecuteQuery(query, new OracleParameter("PCNO", pcno.Trim()));
                 if (dt != null && dt.Rows.Count > 0)
                 {
@@ -868,10 +1245,10 @@ namespace EducationApp.Utils
             }
             catch { }
 
-            // Try SYSTEM.EMPDETAILS
+            // Try SYSTEM.EMPDETAILS / EMPDETAILS
             try
             {
-                string query = "SELECT PCNO, NAME, DESIGNATION, DIVNAME FROM SYSTEM.EMPDETAILS WHERE PCNO = :PCNO AND ROWNUM <= 1";
+                string query = "SELECT PCNO, NAME, DESIGNATION, DIVNAME FROM EMPDETAILS WHERE TRIM(PCNO) = :PCNO AND ROWNUM <= 1";
                 DataTable dt = ExecuteQuery(query, new OracleParameter("PCNO", pcno.Trim()));
                 if (dt != null && dt.Rows.Count > 0)
                 {
@@ -969,6 +1346,18 @@ namespace EducationApp.Utils
             }
 
             int highestVal = isHighest ? 1 : 0;
+
+            if (string.Equals(status, "Submitted", StringComparison.OrdinalIgnoreCase))
+            {
+                if (IsPlaceholderOrInvalid(mainQualCode)) throw new ArgumentException("Main Qualification cannot be empty or placeholder ('*').");
+                if (IsPlaceholderOrInvalid(subQualCode)) throw new ArgumentException("Sub Qualification / Stream cannot be empty or placeholder ('*').");
+                if (yearPassed < 1950 || yearPassed > DateTime.Now.Year) throw new ArgumentException("Passing Year is invalid.");
+                if (IsPlaceholderOrInvalid(instituteName)) throw new ArgumentException("University / Board cannot be empty or placeholder ('*').");
+                if (IsPlaceholderOrInvalid(collegeName)) throw new ArgumentException("College / School Name cannot be empty or placeholder ('*').");
+                if (IsPlaceholderOrInvalid(gradeDivision)) throw new ArgumentException("Grade / Division cannot be empty or placeholder ('*').");
+                if (IsInvalidSpecialization(specialization)) throw new ArgumentException("Specialization cannot be empty or placeholder ('*'). ('N/A' is allowed).");
+                if (IsPlaceholderOrInvalid(cgpaMarks)) throw new ArgumentException("Score (Percentage / CGPA / Marks) cannot be empty or placeholder ('*').");
+            }
 
             if (eduId > 0)
             {
@@ -1081,8 +1470,144 @@ namespace EducationApp.Utils
             return false;
         }
 
+        /// <summary>
+        /// Checks whether a given string value represents a dirty, placeholder, or unselected value
+        /// such as '*', '-', 'NA', 'Not Specified', '?', etc. imported from legacy database.
+        /// </summary>
+        public static bool IsPlaceholderOrInvalid(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return true;
+            string t = value.Trim();
+            if (t == "*" || t == "**" || t == "***" ||
+                t == "-" || t == "--" || t == "---" ||
+                t == "." || t == ".." || t == "?" || t == "??" ||
+                t.Equals("NA", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("N/A", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("NOT APPLICABLE", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("NOT SPECIFIED", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("UNKNOWN", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("NONE", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("NULL", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Validates Specialization / Major Subject.
+        /// Allows 'N/A', 'NA', 'Not Applicable', 'General', 'None', etc. as valid entries,
+        /// especially for SSLC / 10th / Matriculation where no specialization exists.
+        /// Only empty strings or actual placeholder symbols ('*', '?', etc.) are blocked.
+        /// </summary>
+        public static bool IsInvalidSpecialization(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return true;
+            string t = value.Trim();
+            if (t == "*" || t == "**" || t == "***" || t == "?" || t == "??")
+            {
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Validates all draft records for an employee to ensure none contain placeholder values (like '*')
+        /// or unselected required fields before official submission.
+        /// Returns a list of detailed human-readable validation error messages.
+        /// </summary>
+        public static System.Collections.Generic.List<string> ValidateDraftRecordsForSubmission(string pcno)
+        {
+            var errors = new System.Collections.Generic.List<string>();
+            string query = @"
+                SELECT EDU_ID, QUAL_MAIN_CODE, QUAL_MAIN_NAME, QUAL_SUB_CODE, QUAL_SUB_NAME,
+                       YEAR_PASSED, INSTITUTE_NAME, COLLEGE_NAME, SPECIALIZATION,
+                       CGPA_MARKS, GRADE_DIVISION
+                FROM EDU_EMP_EDUCATION
+                WHERE PCNO = :PCNO AND STATUS = 'Draft'
+                ORDER BY YEAR_PASSED ASC, EDU_ID ASC";
+
+            DataTable dt = ExecuteQuery(query, new OracleParameter("PCNO", pcno.Trim()));
+            if (dt == null || dt.Rows.Count == 0)
+            {
+                return errors;
+            }
+
+            int currentYear = DateTime.Now.Year;
+
+            foreach (DataRow r in dt.Rows)
+            {
+                int eduId = Convert.ToInt32(r["EDU_ID"]);
+                string mainCode = r["QUAL_MAIN_CODE"] != DBNull.Value ? r["QUAL_MAIN_CODE"].ToString() : "";
+                string mainName = r["QUAL_MAIN_NAME"] != DBNull.Value ? r["QUAL_MAIN_NAME"].ToString() : "";
+                string subCode = r["QUAL_SUB_CODE"] != DBNull.Value ? r["QUAL_SUB_CODE"].ToString() : "";
+                string subName = r["QUAL_SUB_NAME"] != DBNull.Value ? r["QUAL_SUB_NAME"].ToString() : "";
+                string inst = r["INSTITUTE_NAME"] != DBNull.Value ? r["INSTITUTE_NAME"].ToString() : "";
+                string college = r["COLLEGE_NAME"] != DBNull.Value ? r["COLLEGE_NAME"].ToString() : "";
+                string spec = r["SPECIALIZATION"] != DBNull.Value ? r["SPECIALIZATION"].ToString() : "";
+                string cgpa = r["CGPA_MARKS"] != DBNull.Value ? r["CGPA_MARKS"].ToString() : "";
+                string grade = r["GRADE_DIVISION"] != DBNull.Value ? r["GRADE_DIVISION"].ToString() : "";
+
+                int yr = 0;
+                if (r["YEAR_PASSED"] != DBNull.Value)
+                {
+                    int.TryParse(r["YEAR_PASSED"].ToString(), out yr);
+                }
+
+                var missingFields = new System.Collections.Generic.List<string>();
+
+                if (IsPlaceholderOrInvalid(mainCode))
+                {
+                    missingFields.Add("Main Qualification");
+                }
+                if (IsPlaceholderOrInvalid(subCode) || IsPlaceholderOrInvalid(subName))
+                {
+                    missingFields.Add("Sub Qualification / Stream");
+                }
+                if (yr < 1950 || yr > currentYear)
+                {
+                    missingFields.Add("Passing Year (must be between 1950 and " + currentYear + ")");
+                }
+                if (IsPlaceholderOrInvalid(inst))
+                {
+                    missingFields.Add("University / Board / Institute");
+                }
+                if (IsPlaceholderOrInvalid(college))
+                {
+                    missingFields.Add("College / School Name");
+                }
+                if (IsInvalidSpecialization(spec))
+                {
+                    missingFields.Add("Specialization / Major Subject");
+                }
+                if (IsPlaceholderOrInvalid(cgpa))
+                {
+                    missingFields.Add("Score (Percentage / CGPA / Marks)");
+                }
+                if (IsPlaceholderOrInvalid(grade))
+                {
+                    missingFields.Add("Grade / Division");
+                }
+
+                if (missingFields.Count > 0)
+                {
+                    string qualLabel = !string.IsNullOrEmpty(mainName) ? mainName : (!string.IsNullOrEmpty(mainCode) ? mainCode : "Qualification #" + eduId);
+                    errors.Add(string.Format("Record #{0} ({1}): Contains placeholder or unselected values in <strong>{2}</strong>.", 
+                        eduId, qualLabel, string.Join(", ", missingFields)));
+                }
+            }
+
+            return errors;
+        }
+
         public static int SubmitAllEducationRecords(string pcno, string currentUser)
         {
+            var validationErrors = ValidateDraftRecordsForSubmission(pcno);
+            if (validationErrors.Count > 0)
+            {
+                throw new InvalidOperationException("Submission blocked: Some draft qualification records contain placeholder values (such as '*'). All required fields must have proper selections before submitting.");
+            }
+
             string submitSql = @"
                 UPDATE EDU_EMP_EDUCATION SET 
                     STATUS = 'Submitted', 
@@ -1278,7 +1803,7 @@ namespace EducationApp.Utils
 
         public static DataTable GetMainQualifications(bool activeOnly = true)
         {
-            string query = "SELECT QUAL_CODE, QUAL_NAME, QUAL_CATEGORY FROM EDU_QUAL_MAIN";
+            string query = "SELECT QUAL_CODE, QUAL_NAME, QUAL_CATEGORY, (QUAL_CODE || ' - ' || QUAL_NAME) AS DISPLAY_NAME FROM EDU_QUAL_MAIN";
             if (activeOnly) query += " WHERE IS_ACTIVE = 1";
             query += " ORDER BY QUAL_CATEGORY ASC, QUAL_NAME ASC";
             return ExecuteQuery(query);
@@ -1304,12 +1829,198 @@ namespace EducationApp.Utils
             return ExecuteQuery(query, parameters.ToArray());
         }
 
+        private static string _cachedSubQualJson = null;
+
+        public static string GetSubQualificationsJson()
+        {
+            if (_cachedSubQualJson != null) return _cachedSubQualJson;
+
+            DataTable dtSub = GetSubQualifications(null, true);
+            var subList = new System.Collections.Generic.List<object>();
+            if (dtSub != null)
+            {
+                foreach (DataRow r in dtSub.Rows)
+                {
+                    string subCode = r["SUB_CODE"].ToString().Trim();
+                    string subName = r["SUB_NAME"].ToString().Trim();
+                    string mainCode = r["MAIN_QUAL_CODE"] != DBNull.Value ? r["MAIN_QUAL_CODE"].ToString().Trim() : "";
+                    subList.Add(new { code = subCode, name = subName, main = mainCode });
+                }
+            }
+            subList.Add(new { code = "GENERAL", name = "General", main = "" });
+            subList.Add(new { code = "OTHER", name = "Other (Specify in Specialization)", main = "" });
+
+            _cachedSubQualJson = new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(subList);
+            return _cachedSubQualJson;
+        }
+
+        public static void InvalidateSubQualificationsCache()
+        {
+            _cachedSubQualJson = null;
+        }
+
         public static DataTable GetUniversities(bool activeOnly = true)
         {
-            string query = "SELECT UNIV_ID, UNIV_NAME FROM EDU_UNIVERSITY";
-            if (activeOnly) query += " WHERE IS_ACTIVE = 1";
-            query += " ORDER BY UNIV_NAME ASC";
+            // Consolidate duplicates by UNIV_NAME using MIN(UNIV_ID) and filter standalone redundant abbreviations
+            string query = "SELECT MIN(UNIV_ID) AS UNIV_ID, UNIV_NAME, MAX(STATE_OR_TYPE) AS STATE_OR_TYPE FROM EDU_UNIVERSITY";
+            if (activeOnly)
+            {
+                query += " WHERE IS_ACTIVE = 1 AND UPPER(TRIM(UNIV_NAME)) NOT IN ('VTU', 'JNTU', 'IISC', 'SEBA', 'AHSEC', 'WBBSE', 'WBCHSE', 'ISC', 'CSBE', 'D.U', '*')";
+            }
+            query += " GROUP BY UNIV_NAME ORDER BY UNIV_NAME ASC";
             return ExecuteQuery(query);
+        }
+
+        public static DataTable GetCollegesMaster(bool activeOnly = false)
+        {
+            string query = "SELECT COLLEGE_ID, COLLEGE_NAME, COLLEGE_TYPE, LOCATION, AFFILIATED_UNIV, IS_ACTIVE FROM EDU_COLLEGE";
+            if (activeOnly) query += " WHERE IS_ACTIVE = 1";
+            query += " ORDER BY COLLEGE_NAME ASC";
+            try
+            {
+                return ExecuteQuery(query);
+            }
+            catch
+            {
+                return new DataTable();
+            }
+        }
+
+        public static DataTable GetColleges()
+        {
+            DataTable dt = new DataTable();
+            dt.Columns.Add("COLLEGE_NAME", typeof(string));
+
+            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // 1. Fetch colleges directly from official EDU_COLLEGE master table
+            try
+            {
+                string sqlCol = "SELECT COLLEGE_NAME FROM EDU_COLLEGE WHERE IS_ACTIVE = 1 ORDER BY COLLEGE_NAME ASC";
+                DataTable dtCol = ExecuteQuery(sqlCol);
+                if (dtCol != null && dtCol.Rows.Count > 0)
+                {
+                    foreach (DataRow r in dtCol.Rows)
+                    {
+                        string name = r["COLLEGE_NAME"].ToString().Trim();
+                        if (!string.IsNullOrEmpty(name) && seen.Add(name))
+                        {
+                            dt.Rows.Add(name);
+                        }
+                    }
+                    DataView dvMaster = dt.DefaultView;
+                    dvMaster.Sort = "COLLEGE_NAME ASC";
+                    return dvMaster.ToTable();
+                }
+            }
+            catch { }
+
+            // 2. Fallback to standard catalog only if EDU_COLLEGE table is not yet populated
+            string[] standardColleges = new string[]
+            {
+                // Premier Engineering Colleges (Karnataka & India)
+                "Mangalore Institute of Technology and Engineering (MITE), Moodabidri",
+                "RV College of Engineering (RVCE), Bengaluru",
+                "BMS College of Engineering (BMSCE), Bengaluru",
+                "M.S. Ramaiah Institute of Technology (MSRIT), Bengaluru",
+                "PES Institute of Technology / PES University, Bengaluru",
+                "Bangalore Institute of Technology (BIT), Bengaluru",
+                "Dayananda Sagar College of Engineering (DSCE), Bengaluru",
+                "Sir M. Visvesvaraya Institute of Technology (SMVIT), Bengaluru",
+                "Siddaganga Institute of Technology (SIT), Tumakuru",
+                "The National Institute of Engineering (NIE), Mysuru",
+                "Sri Jayachamarajendra College of Engineering (SJCE), Mysuru",
+                "NMAM Institute of Technology (NMAMIT), Nitte",
+                "Canara Engineering College (CEC), Benjanapadavu, Mangaluru",
+                "St. Joseph Engineering College (SJEC), Vamanjoor, Mangaluru",
+                "Sahyadri College of Engineering & Management, Adyar, Mangaluru",
+                "P.A. College of Engineering (PACE), Mangaluru",
+                "Srinivas Institute of Technology (SIT), Valachil, Mangaluru",
+                "Bearys Institute of Technology (BIT), Mangaluru",
+                "Alva's Institute of Engineering & Technology (AIET), Moodabidri",
+                "Shri Madhwa Vadiraja Institute of Technology & Management (SMVITM), Bantakal",
+                "B.N.M. Institute of Technology (BNMIT), Bengaluru",
+                "RNS Institute of Technology (RNSIT), Bengaluru",
+                "JSS Academy of Technical Education (JSSATE), Bengaluru",
+                "New Horizon College of Engineering (NHCE), Bengaluru",
+                "CMR Institute of Technology (CMRIT), Bengaluru",
+                "The Oxford College of Engineering, Bengaluru",
+                "Nitte Meenakshi Institute of Technology (NMIT), Bengaluru",
+                "KLE Technological University / BVB College of Engineering, Hubballi",
+                "Basaveshwar Engineering College (BEC), Bagalkot",
+                "SDM College of Engineering and Technology (SDMCET), Dharwad",
+                "Malnad College of Engineering (MCE), Hassan",
+                "Bapuji Institute of Engineering and Technology (BIET), Davangere",
+                "University Visvesvaraya College of Engineering (UVCE), Bengaluru",
+                "College of Engineering, Pune (COEP)",
+                "Veermata Jijabai Technological Institute (VJTI), Mumbai",
+                "College of Engineering, Guindy (CEG), Anna University, Chennai",
+                "PSG College of Technology, Coimbatore",
+                "Thapar Institute of Engineering and Technology, Patiala",
+                "Birla Institute of Technology (BIT), Mesra, Ranchi",
+                "Manipal Institute of Technology (MIT), Manipal",
+
+                // Degree, Science, Arts & Commerce Colleges
+                "St. Aloysius College (Autonomous), Mangaluru",
+                "St. Agnes College (Autonomous), Mangaluru",
+                "Canara College, Mangaluru",
+                "SDM College (Autonomous), Ujire",
+                "Bhandarkars' Arts & Science College, Kundapura",
+                "Poornaprajna College (PPC), Udupi",
+                "Mahatma Gandhi Memorial College (MGM), Udupi",
+                "St. Joseph's University / College, Bengaluru",
+                "Mount Carmel College (MCC), Bengaluru",
+                "National College, Basavanagudi, Bengaluru",
+                "MES College of Arts, Commerce and Science, Bengaluru",
+                "St. Xavier's College, Mumbai",
+                "Loyola College, Chennai",
+                "Madras Christian College (MCC), Chennai",
+                "Fergusson College, Pune",
+                "St. Stephen's College, Delhi",
+                "Hindu College, University of Delhi",
+                "Hansraj College, University of Delhi",
+                "Shri Ram College of Commerce (SRCC), Delhi",
+                "Presidency College, Kolkata",
+
+                // Pre-University (PU) Colleges & Higher Secondary Schools
+                "Canara Pre-University College, Mangaluru",
+                "St. Aloysius Pre-University College, Mangaluru",
+                "Expert Pre-University College, Mangaluru",
+                "Sharada Pre-University College, Mangaluru",
+                "Alva's Pre-University College, Moodabidri",
+                "National Pre-University College, Bengaluru",
+                "MES Pre-University College, Bengaluru",
+                "Christ Junior College, Bengaluru",
+                "Mahesh PU College, Mangaluru",
+                "Government Pre-University College (State PU Board)",
+                "Kendriya Vidyalaya (KV)",
+                "Jawahar Navodaya Vidyalaya (JNV)",
+                "Delhi Public School (DPS)",
+                "DAV Public School",
+                "Army Public School",
+                "National Public School (NPS), Bengaluru",
+                "Bishop Cotton Boys' / Girls' School, Bengaluru",
+                "St. Joseph's Boys' High School, Bengaluru",
+
+                // Polytechnic & Technical Institutes
+                "Karnataka (Govt) Polytechnic (KPT), Mangaluru",
+                "Government Polytechnic, Bengaluru",
+                "S.J. Polytechnic, Bengaluru",
+                "PES Polytechnic, Bengaluru",
+                "Govt ITI College / Industrial Training Institute"
+            };
+
+            foreach (var c in standardColleges)
+            {
+                if (seen.Add(c))
+                {
+                    dt.Rows.Add(c);
+                }
+            }
+
+            DataView dv = dt.DefaultView;
+            dv.Sort = "COLLEGE_NAME ASC";
+            return dv.ToTable();
         }
 
         public static DataTable GetSubjects(bool activeOnly = true)
@@ -1329,6 +2040,26 @@ namespace EducationApp.Utils
                 new OracleParameter("CAT", category.Trim())) > 0;
         }
 
+        public static bool UpdateMainQualification(string code, string name, string category)
+        {
+            string sql = "UPDATE EDU_QUAL_MAIN SET QUAL_NAME = :N, QUAL_CATEGORY = :CAT WHERE QUAL_CODE = :C";
+            return ExecuteNonQuery(sql,
+                new OracleParameter("N", name.Trim()),
+                new OracleParameter("CAT", category.Trim()),
+                new OracleParameter("C", code.Trim().ToUpper())) > 0;
+        }
+
+        public static bool DeleteMainQualification(string code)
+        {
+            // Unbind child sub-qualifications so they are not orphaned
+            ExecuteNonQuery("UPDATE EDU_QUAL_SUB SET MAIN_QUAL_CODE = NULL WHERE MAIN_QUAL_CODE = :C",
+                new OracleParameter("C", code.Trim().ToUpper()));
+
+            string sql = "DELETE FROM EDU_QUAL_MAIN WHERE QUAL_CODE = :C";
+            return ExecuteNonQuery(sql,
+                new OracleParameter("C", code.Trim().ToUpper())) > 0;
+        }
+
         public static bool AddSubQualification(string mainCode, string subCode, string subName)
         {
             string sql = "INSERT INTO EDU_QUAL_SUB (MAIN_QUAL_CODE, SUB_CODE, SUB_NAME, IS_ACTIVE) VALUES (:MQ, :SC, :SN, 1)";
@@ -1338,12 +2069,108 @@ namespace EducationApp.Utils
                 new OracleParameter("SN", subName.Trim())) > 0;
         }
 
+        public static bool UpdateSubQualification(int subId, string mainCode, string subCode, string subName)
+        {
+            string sql = "UPDATE EDU_QUAL_SUB SET MAIN_QUAL_CODE = :MQ, SUB_CODE = :SC, SUB_NAME = :SN WHERE SUB_ID = :ID";
+            return ExecuteNonQuery(sql,
+                new OracleParameter("MQ", string.IsNullOrEmpty(mainCode) ? (object)DBNull.Value : mainCode.Trim().ToUpper()),
+                new OracleParameter("SC", subCode.Trim().ToUpper()),
+                new OracleParameter("SN", subName.Trim()),
+                new OracleParameter("ID", subId)) > 0;
+        }
+
+        public static bool DeleteSubQualification(int subId)
+        {
+            string sql = "DELETE FROM EDU_QUAL_SUB WHERE SUB_ID = :ID";
+            return ExecuteNonQuery(sql,
+                new OracleParameter("ID", subId)) > 0;
+        }
+
         public static bool AddUniversity(string name, string stateOrType)
         {
+            if (string.IsNullOrEmpty(name)) return false;
+            string trimmedName = name.Trim();
+
+            // Prevent duplicate insertion
+            string checkSql = "SELECT COUNT(*) FROM EDU_UNIVERSITY WHERE UPPER(TRIM(UNIV_NAME)) = :N";
+            object cnt = ExecuteScalar(checkSql, new OracleParameter("N", trimmedName.ToUpper()));
+            if (cnt != null && Convert.ToInt32(cnt) > 0)
+            {
+                string activateSql = "UPDATE EDU_UNIVERSITY SET IS_ACTIVE = 1 WHERE UPPER(TRIM(UNIV_NAME)) = :N";
+                ExecuteNonQuery(activateSql, new OracleParameter("N", trimmedName.ToUpper()));
+                return true;
+            }
+
             string sql = "INSERT INTO EDU_UNIVERSITY (UNIV_ID, UNIV_NAME, STATE_OR_TYPE, IS_ACTIVE) VALUES (SEQ_EDU_UNIVERSITY.NEXTVAL, :N, :ST, 1)";
             return ExecuteNonQuery(sql,
-                new OracleParameter("N", name.Trim()),
+                new OracleParameter("N", trimmedName),
                 new OracleParameter("ST", stateOrType ?? "")) > 0;
+        }
+
+        public static bool UpdateUniversity(int univId, string name, string stateOrType)
+        {
+            string sql = "UPDATE EDU_UNIVERSITY SET UNIV_NAME = :N, STATE_OR_TYPE = :ST WHERE UNIV_ID = :ID";
+            return ExecuteNonQuery(sql,
+                new OracleParameter("N", name.Trim()),
+                new OracleParameter("ST", stateOrType ?? ""),
+                new OracleParameter("ID", univId)) > 0;
+        }
+
+        public static bool DeleteUniversity(int univId)
+        {
+            string sql = "DELETE FROM EDU_UNIVERSITY WHERE UNIV_ID = :ID";
+            return ExecuteNonQuery(sql,
+                new OracleParameter("ID", univId)) > 0;
+        }
+
+        public static bool AddCollege(string name, string type, string location, string affiliatedUniv)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            string trimmedName = name.Trim();
+
+            // Prevent duplicate insertion
+            string checkSql = "SELECT COUNT(*) FROM EDU_COLLEGE WHERE UPPER(TRIM(COLLEGE_NAME)) = :N";
+            object cnt = ExecuteScalar(checkSql, new OracleParameter("N", trimmedName.ToUpper()));
+            if (cnt != null && Convert.ToInt32(cnt) > 0)
+            {
+                string activateSql = @"UPDATE EDU_COLLEGE 
+                                       SET IS_ACTIVE = 1, COLLEGE_TYPE = :T, LOCATION = :L, AFFILIATED_UNIV = :U 
+                                       WHERE UPPER(TRIM(COLLEGE_NAME)) = :N";
+                ExecuteNonQuery(activateSql,
+                    new OracleParameter("T", type ?? ""),
+                    new OracleParameter("L", location ?? ""),
+                    new OracleParameter("U", affiliatedUniv ?? ""),
+                    new OracleParameter("N", trimmedName.ToUpper()));
+                return true;
+            }
+
+            string sql = @"INSERT INTO EDU_COLLEGE (COLLEGE_ID, COLLEGE_NAME, COLLEGE_TYPE, LOCATION, AFFILIATED_UNIV, IS_ACTIVE) 
+                           VALUES (SEQ_EDU_COLLEGE.NEXTVAL, :N, :T, :L, :U, 1)";
+            return ExecuteNonQuery(sql,
+                new OracleParameter("N", trimmedName),
+                new OracleParameter("T", type ?? ""),
+                new OracleParameter("L", location ?? ""),
+                new OracleParameter("U", affiliatedUniv ?? "")) > 0;
+        }
+
+        public static bool UpdateCollege(int collegeId, string name, string type, string location, string affiliatedUniv)
+        {
+            string sql = @"UPDATE EDU_COLLEGE 
+                           SET COLLEGE_NAME = :N, COLLEGE_TYPE = :T, LOCATION = :L, AFFILIATED_UNIV = :U 
+                           WHERE COLLEGE_ID = :ID";
+            return ExecuteNonQuery(sql,
+                new OracleParameter("N", name.Trim()),
+                new OracleParameter("T", type ?? ""),
+                new OracleParameter("L", location ?? ""),
+                new OracleParameter("U", affiliatedUniv ?? ""),
+                new OracleParameter("ID", collegeId)) > 0;
+        }
+
+        public static bool DeleteCollege(int collegeId)
+        {
+            string sql = "DELETE FROM EDU_COLLEGE WHERE COLLEGE_ID = :ID";
+            return ExecuteNonQuery(sql,
+                new OracleParameter("ID", collegeId)) > 0;
         }
 
         public static bool AddSubject(string name, string group)
@@ -1352,6 +2179,22 @@ namespace EducationApp.Utils
             return ExecuteNonQuery(sql,
                 new OracleParameter("N", name.Trim()),
                 new OracleParameter("GRP", group ?? "")) > 0;
+        }
+
+        public static bool UpdateSubject(int subjectId, string name, string group)
+        {
+            string sql = "UPDATE EDU_SUBJECT SET SUBJECT_NAME = :N, SUBJECT_GROUP = :GRP WHERE SUBJECT_ID = :ID";
+            return ExecuteNonQuery(sql,
+                new OracleParameter("N", name.Trim()),
+                new OracleParameter("GRP", group ?? ""),
+                new OracleParameter("ID", subjectId)) > 0;
+        }
+
+        public static bool DeleteSubject(int subjectId)
+        {
+            string sql = "DELETE FROM EDU_SUBJECT WHERE SUBJECT_ID = :ID";
+            return ExecuteNonQuery(sql,
+                new OracleParameter("ID", subjectId)) > 0;
         }
 
         public static DataTable GetAdminUsers()
@@ -1373,6 +2216,23 @@ namespace EducationApp.Utils
                 new OracleParameter("NAME", name ?? "Admin")) > 0;
         }
 
+        public static bool UpdateAdminUser(string pcno, string name, string role)
+        {
+            string sql = "UPDATE EDU_ADMIN_USERS SET USER_NAME = :N, ROLE = :R WHERE PCNO = :PCNO";
+            return ExecuteNonQuery(sql,
+                new OracleParameter("N", name.Trim()),
+                new OracleParameter("R", role ?? "Admin"),
+                new OracleParameter("PCNO", pcno.Trim())) > 0;
+        }
+
+        public static bool DeleteAdminUser(string pcno)
+        {
+            if (pcno.Trim() == "1001") return false;
+            string sql = "DELETE FROM EDU_ADMIN_USERS WHERE PCNO = :PCNO";
+            return ExecuteNonQuery(sql,
+                new OracleParameter("PCNO", pcno.Trim())) > 0;
+        }
+
         public static bool ToggleAdminUser(string pcno, bool active)
         {
             string sql = "UPDATE EDU_ADMIN_USERS SET IS_ACTIVE = :ACT WHERE PCNO = :PCNO";
@@ -1384,6 +2244,16 @@ namespace EducationApp.Utils
         #endregion
 
         #region Data Migration Engine (HR_EMP_EDUCATION -> EDU_EMP_EDUCATION)
+
+        public static string GetLegacyEducationTableName()
+        {
+            string tbl = ConfigurationManager.AppSettings["LegacyEducationTable"];
+            if (!string.IsNullOrWhiteSpace(tbl))
+            {
+                return tbl.Trim();
+            }
+            return "HR_EMP_EDUCATION";
+        }
 
         public static DataTable GetMigrationStats()
         {
@@ -1399,10 +2269,11 @@ namespace EducationApp.Utils
 
             try
             {
-                object totObj = ExecuteScalar("SELECT COUNT(*) FROM HR_EMP_EDUCATION");
+                string legTable = GetLegacyEducationTableName();
+                object totObj = ExecuteScalar("SELECT COUNT(*) FROM " + legTable);
                 legTotal = totObj != null ? Convert.ToInt32(totObj) : 0;
 
-                object empObj = ExecuteScalar("SELECT COUNT(DISTINCT PCNO) FROM HR_EMP_EDUCATION");
+                object empObj = ExecuteScalar("SELECT COUNT(DISTINCT PCNO) FROM " + legTable);
                 legEmp = empObj != null ? Convert.ToInt32(empObj) : 0;
 
                 object migObj = ExecuteScalar("SELECT COUNT(*) FROM EDU_EMP_EDUCATION WHERE IS_MIGRATED = 1");
@@ -1457,18 +2328,22 @@ namespace EducationApp.Utils
             int totalRead = 0;
             int totalMigrated = 0;
             int totalSkipped = 0;
+            int skippedNoEmpDetails = 0;
+            int skippedAlreadyMigrated = 0;
 
             EnsureSchema();
 
             try
             {
+                string legTable = GetLegacyEducationTableName();
+
                 // Fetch legacy records
-                string queryOld = "SELECT PCNO, CTREDN, QFNID, UNIVINSTID, COLLEGENAME, SUBJECTID, YEARPASSED, GRADE, PERCENTAGE, HIGHESTQFN FROM HR_EMP_EDUCATION ORDER BY PCNO, CTREDN";
+                string queryOld = "SELECT PCNO, CTREDN, QFNID, UNIVINSTID, COLLEGENAME, SUBJECTID, YEARPASSED, GRADE, PERCENTAGE, HIGHESTQFN FROM " + legTable + " ORDER BY PCNO, CTREDN";
                 DataTable dtOld = ExecuteQuery(queryOld);
 
                 if (dtOld == null || dtOld.Rows.Count == 0)
                 {
-                    return "No records found in HR_EMP_EDUCATION table to migrate.";
+                    return "No records found in " + legTable + " table to migrate.";
                 }
 
                 totalRead = dtOld.Rows.Count;
@@ -1506,13 +2381,34 @@ namespace EducationApp.Utils
                     subjDict[Convert.ToInt32(sr["SUBJECT_ID"])] = sr["SUBJECT_NAME"].ToString();
                 }
 
+                // Cache employee check to avoid repetitive DB lookups
+                Dictionary<string, Tuple<bool, string, string, string>> empCache = new Dictionary<string, Tuple<bool, string, string, string>>(StringComparer.OrdinalIgnoreCase);
+
                 // Process migration
                 foreach (DataRow r in dtOld.Rows)
                 {
-                    string pcno = r["PCNO"].ToString();
+                    string pcno = r["PCNO"].ToString().Trim();
                     int ctredn = Convert.ToInt32(r["CTREDN"]);
 
-                    // Check if already migrated
+                    // 1. Check whether PCNO exists in hrdata.empdetails before importing
+                    Tuple<bool, string, string, string> empInfo;
+                    if (!empCache.TryGetValue(pcno, out empInfo))
+                    {
+                        string eName, eDesig, eDiv;
+                        bool exists = CheckEmployeeExistsInHrData(pcno, out eName, out eDesig, out eDiv);
+                        empInfo = Tuple.Create(exists, eName, eDesig, eDiv);
+                        empCache[pcno] = empInfo;
+                    }
+
+                    if (!empInfo.Item1)
+                    {
+                        // PCNO is not in hrdata.empdetails -> Do NOT import
+                        totalSkipped++;
+                        skippedNoEmpDetails++;
+                        continue;
+                    }
+
+                    // 2. Check if already migrated
                     string checkExists = "SELECT COUNT(*) FROM EDU_EMP_EDUCATION WHERE PCNO = :PCNO AND OLD_CTREDN = :CTREDN";
                     object existsObj = ExecuteScalar(checkExists,
                         new OracleParameter("PCNO", pcno),
@@ -1521,6 +2417,7 @@ namespace EducationApp.Utils
                     if (existsObj != null && Convert.ToInt32(existsObj) > 0)
                     {
                         totalSkipped++;
+                        skippedAlreadyMigrated++;
                         continue;
                     }
 
@@ -1556,16 +2453,43 @@ namespace EducationApp.Utils
                     string highStr = r["HIGHESTQFN"] != DBNull.Value ? r["HIGHESTQFN"].ToString().Trim().ToUpper() : "N";
                     bool isHighest = (highStr == "Y" || highStr == "YES" || highStr == "1" || highStr == "TRUE");
 
-                    // Employee Profile lookup
-                    DataRow empProfile = GetEmployeeProfile(pcno);
-                    string empName = empProfile != null ? empProfile["NAME"].ToString() : ("Employee " + pcno);
-                    string desig = empProfile != null ? empProfile["DESIGNATION"].ToString() : "";
-                    string div = empProfile != null ? empProfile["DIVNAME"].ToString() : "";
+                    // Employee Profile details from verified empdetails
+                    string empName = !string.IsNullOrWhiteSpace(empInfo.Item2) ? empInfo.Item2 : ("Employee " + pcno);
+                    string desig = empInfo.Item3 ?? "";
+                    string div = empInfo.Item4 ?? "";
 
                     int yearPassed = r["YEARPASSED"] != DBNull.Value ? Convert.ToInt32(r["YEARPASSED"]) : 2000;
                     string grade = r["GRADE"] != DBNull.Value ? r["GRADE"].ToString() : "Pass";
                     string pct = r["PERCENTAGE"] != DBNull.Value ? r["PERCENTAGE"].ToString() : "N/A";
                     string college = r["COLLEGENAME"] != DBNull.Value ? r["COLLEGENAME"].ToString() : "";
+
+                    // If record contains placeholder values like '*', force to Draft so employee must verify and select proper values
+                    string rowStatus = defaultStatus;
+                    if (IsPlaceholderOrInvalid(college) || IsPlaceholderOrInvalid(instName) ||
+                        IsInvalidSpecialization(specName) || IsPlaceholderOrInvalid(grade) ||
+                        IsPlaceholderOrInvalid(pct) ||
+                        yearPassed < 1950)
+                    {
+                        rowStatus = "Draft";
+                    }
+
+                    // Normalize score format if raw number (e.g. 78.4 -> 78.4%, 8.45 -> 8.45 CGPA)
+                    string finalScore = pct;
+                    if (!IsPlaceholderOrInvalid(pct))
+                    {
+                        double pNum;
+                        if (double.TryParse(pct.Trim(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out pNum))
+                        {
+                            if (pNum > 10.0 && pNum <= 100.0)
+                            {
+                                finalScore = pNum.ToString("0.##") + "%";
+                            }
+                            else if (pNum > 0.0 && pNum <= 10.0)
+                            {
+                                finalScore = pNum.ToString("0.##") + " CGPA";
+                            }
+                        }
+                    }
 
                     string insertSql = @"
                         INSERT INTO EDU_EMP_EDUCATION (
@@ -1596,11 +2520,11 @@ namespace EducationApp.Utils
                         new OracleParameter("INST", instName),
                         new OracleParameter("COLL", college),
                         new OracleParameter("SPEC", specName),
-                        new OracleParameter("CGPA", pct),
+                        new OracleParameter("CGPA", finalScore),
                         new OracleParameter("GRD", grade),
                         new OracleParameter("HIGH", isHighest ? 1 : 0),
-                        new OracleParameter("REM", "Migrated from HR_EMP_EDUCATION (CTREDN: " + ctredn + ")"),
-                        new OracleParameter("ST", defaultStatus),
+                        new OracleParameter("REM", "Migrated from " + legTable + " (CTREDN: " + ctredn + ")"),
+                        new OracleParameter("ST", rowStatus),
                         new OracleParameter("USR", executedBy),
                         new OracleParameter("CTR", ctredn));
 
@@ -1608,6 +2532,10 @@ namespace EducationApp.Utils
                 }
 
                 // Log migration
+                string logDetails = string.Format(
+                    "Migration executed successfully. Total Read: {0}, Migrated: {1}, Skipped: {2} ({3} already existed, {4} skipped because PCNO not found in hrdata.empdetails).",
+                    totalRead, totalMigrated, totalSkipped, skippedAlreadyMigrated, skippedNoEmpDetails);
+
                 string logSql = @"
                     INSERT INTO EDU_MIGRATION_LOG (LOG_ID, MIGRATION_DATE, EXECUTED_BY, TOTAL_READ, TOTAL_MIGRATED, TOTAL_SKIPPED, STATUS, LOG_DETAILS)
                     VALUES (SEQ_EDU_MIG_LOG.NEXTVAL, SYSDATE, :USR, :TR, :TM, :TS, 'COMPLETED', :DET)";
@@ -1617,9 +2545,11 @@ namespace EducationApp.Utils
                     new OracleParameter("TR", totalRead),
                     new OracleParameter("TM", totalMigrated),
                     new OracleParameter("TS", totalSkipped),
-                    new OracleParameter("DET", "Migration executed successfully. Total Read: " + totalRead + ", Migrated: " + totalMigrated + ", Skipped: " + totalSkipped));
+                    new OracleParameter("DET", logDetails));
 
-                return "Migration completed successfully! Processed: " + totalRead + " records. Newly Migrated: " + totalMigrated + ", Skipped (Already existed): " + totalSkipped + ".";
+                return string.Format(
+                    "Migration completed successfully! Processed: {0} records. Newly Migrated: {1}, Skipped: {2} ({3} already existed, {4} not in hrdata.empdetails).",
+                    totalRead, totalMigrated, totalSkipped, skippedAlreadyMigrated, skippedNoEmpDetails);
             }
             catch (Exception ex)
             {

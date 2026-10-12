@@ -152,7 +152,7 @@ A `MERGE` statement checks if a record with the same key already exists:
 
 This means you can run `02_Seed_MasterData.sql` multiple times without duplicating data. This is very useful during upgrades.
 
-**Important for deployment:** This file is large (~146KB, 961 lines). Run it completely — do not stop midway. In SQL Developer, use **Run Script (F5)** not **Run Statement (Ctrl+Enter)**.
+**Important for deployment:** This file is comprehensive (~198KB, 1,328+ lines) containing 140+ UGC/AICTE main qualifications, linked degree-specific sub-qualifications, and 548+ Central/State universities and examination boards. Run it completely — do not stop midway. In SQL Developer, use **Run Script (F5)** not **Run Statement (Ctrl+Enter)**.
 
 ---
 
@@ -169,13 +169,18 @@ This means you can run `02_Seed_MasterData.sql` multiple times without duplicati
 
 ```
 For each row in HR_EMP_EDUCATION:
-  1. Check if already migrated (skip if OLD_CTREDN already exists)
-  2. Look up the old QFNID in EDU_QUAL_MAPPING to get the new QUAL_CODE
-  3. Resolve the university name from EDU_UNIVERSITY using UNIVINSTID
-  4. Resolve the subject/specialization from EDU_SUBJECT using SUBJECTID
-  5. Fetch employee name, designation, division from hrdata.empdetails
-  6. Insert into EDU_EMP_EDUCATION with IS_MIGRATED = 1
-  7. Log the result in EDU_MIGRATION_LOG
+  1. Check if employee PCNO exists in hrdata.empdetails (skip import if not found)
+  2. Check if already migrated (skip if OLD_CTREDN already exists)
+  3. Look up the old QFNID in EDU_QUAL_MAPPING to get the new QUAL_MAIN_CODE
+  4. Resolve the university name from EDU_UNIVERSITY using UNIVINSTID
+  5. Resolve subject/specialization from EDU_SUBJECT using SUBJECTID:
+     - Legacy HR_EMP_EDUCATION has no separate SUB_QUALIFICATION column; it used SUBJECTID.
+     - Resolves SUBJECT_NAME into SPECIALIZATION.
+     - Intelligently checks EDU_QUAL_SUB matching the subject name to resolve QUAL_SUB_CODE and canonical QUAL_SUB_NAME (e.g. MCA + "Computer Applications" -> SUB_CODE 'CA').
+     - Falls back to mapping default or 'GENERAL' if no exact sub-qualification is registered.
+  6. Fetch employee name, designation, division from hrdata.empdetails
+  7. Insert into EDU_EMP_EDUCATION with IS_MIGRATED = 1
+  8. Log the result in EDU_MIGRATION_LOG
 ```
 
 **How to execute the migration from Oracle SQL Developer:**
@@ -234,12 +239,13 @@ If your HR department still updates education records in the old system while em
 
 ```
 AFTER INSERT OR UPDATE on HR_EMP_EDUCATION (fires for each row):
-  1. Resolve qualification code using EDU_QUAL_MAPPING
-  2. Resolve university name using EDU_UNIVERSITY
-  3. Resolve subject/specialization using EDU_SUBJECT
-  4. Fetch employee details from hrdata.empdetails
-  5. If record already exists in EDU_EMP_EDUCATION → UPDATE it (preserves existing status)
-  6. If record does not exist → INSERT it with STATUS = 'Draft' (allows employee to review, verify, and submit)
+  1. Check if employee PCNO exists in hrdata.empdetails (if not found, do not import - exit immediately)
+  2. Resolve qualification code using EDU_QUAL_MAPPING
+  3. Resolve university name using EDU_UNIVERSITY
+  4. Resolve subject/specialization using EDU_SUBJECT & map to EDU_QUAL_SUB (resolves both SPECIALIZATION and QUAL_SUB_CODE/QUAL_SUB_NAME)
+  5. Fetch employee details from hrdata.empdetails
+  6. If record already exists in EDU_EMP_EDUCATION → UPDATE it (preserves existing status)
+  7. If record does not exist → INSERT it with STATUS = 'Draft' (allows employee to review, verify, and submit)
 ```
 
 **Important difference from Script 03:**
