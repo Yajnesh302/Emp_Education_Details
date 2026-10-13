@@ -389,6 +389,55 @@ namespace EducationApp.Utils
 
                         // 12. Ensure Sub Qualifications are mapped to Main Qualifications
                         EnsureSubQualificationsLinked(conn);
+
+                        // 13. Ensure legacy migration metadata is cleared from REMARKS column
+                        try
+                        {
+                            if (TableExists(conn, "EDU_EMP_EDUCATION"))
+                            {
+                                ExecuteSql(conn, "UPDATE EDU_EMP_EDUCATION SET REMARKS = NULL WHERE REMARKS LIKE 'Migrated from%' OR REMARKS LIKE 'Auto-synced%'");
+                            }
+                        }
+                        catch { }
+
+                        // 14. Fix Veterinary code collision (GEN -> AGB) and consolidate Matriculation/10th (NA/GEN -> GENERAL)
+                        try
+                        {
+                            if (TableExists(conn, "EDU_QUAL_SUB"))
+                            {
+                                // Disambiguate Veterinary Animal Genetics and Breeding from GEN to AGB
+                                ExecuteSql(conn, "UPDATE EDU_QUAL_SUB SET SUB_CODE = 'AGB' WHERE SUB_NAME LIKE '%Animal Genetics%' AND SUB_CODE = 'GEN'");
+
+                                // Consolidate MTRI (10th) sub-qualifications to standard 'GENERAL'
+                                ExecuteSql(conn, "UPDATE EDU_QUAL_SUB SET SUB_CODE = 'GENERAL', SUB_NAME = 'General (All Subjects)' WHERE MAIN_QUAL_CODE = 'MTRI' AND SUB_CODE IN ('GEN', 'GENERAL')");
+                                ExecuteSql(conn, "DELETE FROM EDU_QUAL_SUB WHERE MAIN_QUAL_CODE = 'MTRI' AND SUB_CODE = 'NA'");
+
+                                // Consolidate BMTRI (Below 10th)
+                                ExecuteSql(conn, "UPDATE EDU_QUAL_SUB SET SUB_CODE = 'GENERAL', SUB_NAME = 'General (Below 10th)' WHERE MAIN_QUAL_CODE = 'BMTRI' AND SUB_CODE = 'NA'");
+                            }
+
+                            if (TableExists(conn, "EDU_QUAL_MAPPING"))
+                            {
+                                ExecuteSql(conn, "UPDATE EDU_QUAL_MAPPING SET NEW_QUAL_SUB_CODE = 'GENERAL' WHERE NEW_QUAL_MAIN_CODE IN ('MTRI', 'BMTRI') AND NEW_QUAL_SUB_CODE IN ('NA', 'GEN')");
+                            }
+
+                            if (TableExists(conn, "EDU_EMP_EDUCATION"))
+                            {
+                                // Auto-heal existing saved/draft records displaying 'Animal Genetics and Breeding' for 10th Standard
+                                ExecuteSql(conn, @"UPDATE EDU_EMP_EDUCATION 
+                                                   SET QUAL_SUB_CODE = 'GENERAL', QUAL_SUB_NAME = 'General (All Subjects)' 
+                                                   WHERE QUAL_MAIN_CODE IN ('MTRI', '10TH') 
+                                                     AND (QUAL_SUB_CODE IN ('GEN', 'NA') OR QUAL_SUB_NAME LIKE '%Animal Genetics%')");
+
+                                ExecuteSql(conn, @"UPDATE EDU_EMP_EDUCATION 
+                                                   SET QUAL_SUB_CODE = 'GENERAL', QUAL_SUB_NAME = 'General (Below 10th)' 
+                                                   WHERE QUAL_MAIN_CODE = 'BMTRI' 
+                                                     AND (QUAL_SUB_CODE IN ('GEN', 'NA') OR QUAL_SUB_NAME LIKE '%Animal Genetics%')");
+                            }
+
+                            InvalidateSubQualificationsCache();
+                        }
+                        catch { }
                     }
 
                     _schemaEnsured = true;
@@ -416,7 +465,7 @@ namespace EducationApp.Utils
 
                 string[] linkStatements = new string[]
                 {
-                    "UPDATE EDU_QUAL_SUB SET MAIN_QUAL_CODE = 'BE' WHERE MAIN_QUAL_CODE IS NULL AND SUB_CODE IN ('CIVIL', 'DMECH', 'COMPE', 'COMPS', 'ELCL', 'E&C', 'ELECT', 'INDST', 'INSTR', 'AERO', 'AUTO', 'CHEMI', 'NANO', 'RACE', 'ADEL', 'ADMT', 'ANMT', 'APH', 'APE', 'APO', 'ARAN', 'CREO', 'CTSP', 'CSYG', 'DENGG', 'DEMQ', 'DSCE', 'AENGG', 'ELTE', 'FLM', 'GAST', 'GUIM', 'GUIW', 'HEPEN', 'INCS', 'INEC', 'INOP', 'LEOE', 'MCDY', 'MACDE', 'MRENG', 'MIELE', 'OEAOC', 'POE', 'PRENG', 'REBTE', 'SOSTA', 'SPER', 'SIT', 'SYSCO', 'SYSSO', 'TELES', 'THERE', 'TODE', 'TOOEN', 'WELTE', 'COMME', 'ELINS', 'SEFEG', 'GENENG', 'AI', 'AM', 'AROSE', 'AUTMO', 'AVONI', 'DSP', 'EE', 'IM', 'INDE', 'INSSP', 'IS', 'IT', 'M&S', 'MAREN', 'MATEC', 'MD', 'METAL', 'MME', 'MSD', 'NARCH', 'PLEN', 'RFM', 'TEXTL')",
+                    "UPDATE EDU_QUAL_SUB SET MAIN_QUAL_CODE = 'BE' WHERE MAIN_QUAL_CODE IS NULL AND SUB_CODE IN ('CIVIL', 'DMECH', 'COMPE', 'COMPS', 'ELCL', 'EC', 'E&C', 'ELECT', 'INDST', 'INSTR', 'AERO', 'AUTO', 'CHEMI', 'NANO', 'RACE', 'ADEL', 'ADMT', 'ANMT', 'APH', 'APE', 'APO', 'ARAN', 'CREO', 'CTSP', 'CSYG', 'DENGG', 'DEMQ', 'DSCE', 'AENGG', 'ELTE', 'FLM', 'GAST', 'GUIM', 'GUIW', 'HEPEN', 'INCS', 'INEC', 'INOP', 'LEOE', 'MCDY', 'MACDE', 'MRENG', 'MIELE', 'OEAOC', 'POE', 'PRENG', 'REBTE', 'SOSTA', 'SPER', 'SIT', 'SYSCO', 'SYSSO', 'TELES', 'THERE', 'TODE', 'TOOEN', 'WELTE', 'COMME', 'ELINS', 'SEFEG', 'GENENG', 'AI', 'AM', 'AROSE', 'AUTMO', 'AVONI', 'DSP', 'EE', 'IM', 'INDE', 'INSSP', 'IS', 'IT', 'MS', 'M&S', 'MAREN', 'MATEC', 'MD', 'METAL', 'MME', 'MSD', 'NARCH', 'PLEN', 'RFM', 'TEXTL')",
                     "UPDATE EDU_QUAL_SUB SET MAIN_QUAL_CODE = 'BSC' WHERE MAIN_QUAL_CODE IS NULL AND SUB_CODE IN ('PHY', 'CHEM', 'MATH', 'BOT', 'ZOO', 'STATS', 'BIO', 'BIOT', 'BICHM', 'GENSC', 'ENV', 'MICBIO', 'MATSC', 'GEOL', 'AGRSC', 'INDM', 'NPHYS', 'OCGG', 'ORACH', 'PHRCH', 'PHYIN', 'PHYME', 'PLBRE', 'PEMLL', 'AG', 'BP', 'FSAT', 'HG', 'HORT', 'MIBIO', 'OPERA', 'POUSC')",
                     "UPDATE EDU_QUAL_SUB SET MAIN_QUAL_CODE = 'BA' WHERE MAIN_QUAL_CODE IS NULL AND SUB_CODE IN ('ENG', 'HND', 'HST', 'ECO', 'POL', 'SOCIO', 'PSY', 'PHIL', 'GEO', 'SS', 'HS', 'PAD', 'TRANS', 'JY', 'AP', 'HP', 'BLIB', 'DSST', 'SRD')",
                     "UPDATE EDU_QUAL_SUB SET MAIN_QUAL_CODE = 'BCOM' WHERE MAIN_QUAL_CODE IS NULL AND SUB_CODE IN ('COM', 'ACC', 'FINAN', 'ACF')",
@@ -571,14 +620,14 @@ namespace EducationApp.Utils
             Tuple<string, string, string>[] subs = new Tuple<string, string, string>[]
             {
                 // Engineering Streams
-                Tuple.Create("BE", "COMPS", "Computer Science & Engineering"),
+                Tuple.Create("BE", "COMPS", "Computer Science and Engineering"),
                 Tuple.Create("BE", "COMPE", "Computer Engineering"),
                 Tuple.Create("BE", "IT", "Information Technology"),
                 Tuple.Create("BE", "SOFTE", "Software Engineering"),
-                Tuple.Create("BE", "AI", "Artificial Intelligence & Data Science"),
-                Tuple.Create("BE", "E&C", "Electronics & Communication"),
-                Tuple.Create("BE", "ELCL", "Electrical & Electronics"),
-                Tuple.Create("BE", "ELTE", "Electronics & Telecommunication"),
+                Tuple.Create("BE", "AI", "Artificial Intelligence and Data Science"),
+                Tuple.Create("BE", "EC", "Electronics and Communication"),
+                Tuple.Create("BE", "ELCL", "Electrical and Electronics"),
+                Tuple.Create("BE", "ELTE", "Electronics and Telecommunication"),
                 Tuple.Create("BE", "DMECH", "Mechanical Engineering"),
                 Tuple.Create("BE", "CIVIL", "Civil Engineering"),
                 Tuple.Create("BE", "AERO", "Aeronautical Engineering"),
@@ -586,27 +635,27 @@ namespace EducationApp.Utils
                 Tuple.Create("BE", "INDST", "Industrial Engineering"),
                 Tuple.Create("BE", "INSTR", "Instrumentation Engineering"),
                 Tuple.Create("BE", "CHEMI", "Chemical Engineering"),
-                Tuple.Create("BE", "METAL", "Metallurgy & Material Science"),
+                Tuple.Create("BE", "METAL", "Metallurgy and Material Science"),
                 Tuple.Create("BE", "AUTMO", "Automobile Engineering"),
-                Tuple.Create("BE", "RACE", "Radar & Communication Engineering"),
+                Tuple.Create("BE", "RACE", "Radar and Communication Engineering"),
                 Tuple.Create("BE", "GENENG", "General Engineering"),
                 Tuple.Create("BE", "OTHER", "Other Engineering Stream"),
 
                 // B.Tech
-                Tuple.Create("BTECH", "COMPS", "Computer Science & Engineering"),
+                Tuple.Create("BTECH", "COMPS", "Computer Science and Engineering"),
                 Tuple.Create("BTECH", "IT", "Information Technology"),
-                Tuple.Create("BTECH", "E&C", "Electronics & Communication"),
-                Tuple.Create("BTECH", "ELCL", "Electrical & Electronics"),
+                Tuple.Create("BTECH", "EC", "Electronics and Communication"),
+                Tuple.Create("BTECH", "ELCL", "Electrical and Electronics"),
                 Tuple.Create("BTECH", "DMECH", "Mechanical Engineering"),
                 Tuple.Create("BTECH", "CIVIL", "Civil Engineering"),
                 Tuple.Create("BTECH", "GENENG", "General Engineering"),
                 Tuple.Create("BTECH", "OTHER", "Other B.Tech Stream"),
 
                 // M.Tech / ME
-                Tuple.Create("MTECH", "COMPS", "Computer Science & Engineering"),
+                Tuple.Create("MTECH", "COMPS", "Computer Science and Engineering"),
                 Tuple.Create("MTECH", "SOFTE", "Software Engineering"),
-                Tuple.Create("MTECH", "E&C", "Digital Electronics & Communication"),
-                Tuple.Create("MTECH", "RACE", "Radar & Communication"),
+                Tuple.Create("MTECH", "EC", "Digital Electronics and Communication"),
+                Tuple.Create("MTECH", "RACE", "Radar and Communication"),
                 Tuple.Create("MTECH", "VLSI", "VLSI Design"),
                 Tuple.Create("MTECH", "DMECH", "Machine Design / Thermal"),
                 Tuple.Create("MTECH", "POE", "Power Electronics"),
@@ -615,7 +664,7 @@ namespace EducationApp.Utils
                 Tuple.Create("MTECH", "OTHER", "Other M.Tech Specialization"),
 
                 Tuple.Create("ME", "COMPS", "Computer Science"),
-                Tuple.Create("ME", "E&C", "Electronics & Communication"),
+                Tuple.Create("ME", "EC", "Electronics and Communication"),
                 Tuple.Create("ME", "DMECH", "Mechanical Engineering"),
                 Tuple.Create("ME", "GENENG", "General ME"),
                 Tuple.Create("ME", "OTHER", "Other ME Specialization"),
@@ -691,9 +740,9 @@ namespace EducationApp.Utils
                 Tuple.Create("MCA", "OTHER", "Other MCA Stream"),
 
                 // 10th
-                Tuple.Create("MTRI", "NA", "All Subjects (General Matriculation)"),
+                Tuple.Create("MTRI", "GENERAL", "General (All Subjects)"),
                 Tuple.Create("MTRI", "OTHER", "Other Board Specialization"),
-                Tuple.Create("BMTRI", "NA", "General (Below 10th)"),
+                Tuple.Create("BMTRI", "GENERAL", "General (Below 10th)"),
 
                 // PUC / 12th
                 Tuple.Create("PUC", "PCMB", "Physics, Chemistry, Maths, Biology (PCMB)"),
@@ -710,7 +759,7 @@ namespace EducationApp.Utils
 
                 // Diploma
                 Tuple.Create("DENG", "DMECH", "Mechanical Engineering"),
-                Tuple.Create("DENG", "E&C", "Electronics & Communication"),
+                Tuple.Create("DENG", "EC", "Electronics and Communication"),
                 Tuple.Create("DENG", "ELCL", "Electrical Engineering"),
                 Tuple.Create("DENG", "CIVIL", "Civil Engineering"),
                 Tuple.Create("DENG", "COMPS", "Computer Science"),
@@ -1074,7 +1123,7 @@ namespace EducationApp.Utils
                 Tuple.Create(16, "BA", "BA", "BA", "ARTS", "Bachelor of Arts"),
                 Tuple.Create(17, "MA", "MA", "MA", "ARTS", "Master of Arts"),
                 Tuple.Create(18, "M.Com", "M.Com", "MCOM", "COM", "Master of Commerce"),
-                Tuple.Create(19, "SSLC/X Class", "SSLC", "MTRI", "NA", "SSLC mapped to 10th"),
+                Tuple.Create(19, "SSLC/X Class", "SSLC", "MTRI", "GENERAL", "SSLC mapped to 10th"),
                 Tuple.Create(20, "PUC/XII", "PUC/XII", "PUC", "PCMB", "PUC mapped to Pre University Course"),
                 Tuple.Create(21, "B.Sc. (Engg.)", "B.Sc. (Engg.)", "BSCEN", "GENENG", "B.Sc. Engineering"),
                 Tuple.Create(26, "DEE", "Diploma", "DENG", "ELCL", "Diploma in Electrical Engg"),
@@ -1087,9 +1136,9 @@ namespace EducationApp.Utils
                 Tuple.Create(55, "BBA", "BBA", "BBA", "MANG", "BBA"),
                 Tuple.Create(59, "BBM", "BBM", "BBM", "MANG", "BBM"),
                 Tuple.Create(65, "BCA", "BCA", "BCA", "COMPS", "BCA"),
-                Tuple.Create(68, "SSC", "SSC", "MTRI", "NA", "SSC (10th)"),
+                Tuple.Create(68, "SSC", "SSC", "MTRI", "GENERAL", "SSC (10th)"),
                 Tuple.Create(70, "AISSCE", "AISSCE", "SCI", "PCMB", "AISSCE (12th)"),
-                Tuple.Create(80, "Below SSLC", "Below SSLC", "BMTRI", "NA", "Below SSLC")
+                Tuple.Create(80, "Below SSLC", "Below SSLC", "BMTRI", "GENERAL", "Below SSLC")
             };
 
             foreach (var m in maps)
@@ -1859,6 +1908,28 @@ namespace EducationApp.Utils
             _cachedSubQualJson = null;
         }
 
+        public static string GetSubQualificationName(string mainQualCode, string subQualCode)
+        {
+            if (string.IsNullOrEmpty(subQualCode)) return string.Empty;
+            try
+            {
+                string query = "SELECT SUB_NAME FROM EDU_QUAL_SUB WHERE SUB_CODE = :SC";
+                List<OracleParameter> pars = new List<OracleParameter> { new OracleParameter("SC", subQualCode) };
+                if (!string.IsNullOrEmpty(mainQualCode))
+                {
+                    query += " AND (MAIN_QUAL_CODE = :MQ OR MAIN_QUAL_CODE IS NULL) ORDER BY CASE WHEN MAIN_QUAL_CODE = :MQ THEN 0 ELSE 1 END";
+                    pars.Add(new OracleParameter("MQ", mainQualCode));
+                }
+                object obj = ExecuteScalar(query, pars.ToArray());
+                if (obj != null && obj != DBNull.Value)
+                {
+                    return obj.ToString().Trim();
+                }
+            }
+            catch { }
+            return string.Empty;
+        }
+
         public static DataTable GetUniversities(bool activeOnly = true)
         {
             // Consolidate duplicates by UNIV_NAME using MIN(UNIV_ID) and filter standalone redundant abbreviations
@@ -1896,26 +1967,26 @@ namespace EducationApp.Utils
             // 1. Fetch colleges directly from official EDU_COLLEGE master table
             try
             {
-                string sqlCol = "SELECT COLLEGE_NAME FROM EDU_COLLEGE WHERE IS_ACTIVE = 1 ORDER BY COLLEGE_NAME ASC";
+                string sqlCol = "SELECT COLLEGE_NAME FROM EDU_COLLEGE WHERE IS_ACTIVE = 1";
                 DataTable dtCol = ExecuteQuery(sqlCol);
                 if (dtCol != null && dtCol.Rows.Count > 0)
                 {
                     foreach (DataRow r in dtCol.Rows)
                     {
                         string name = r["COLLEGE_NAME"].ToString().Trim();
-                        if (!string.IsNullOrEmpty(name) && seen.Add(name))
+                        if (!string.IsNullOrEmpty(name) && !IsPlaceholderOrInvalid(name) && 
+                            !name.Equals("OTHER", StringComparison.OrdinalIgnoreCase) && 
+                            !name.StartsWith("Other /", StringComparison.OrdinalIgnoreCase) && 
+                            seen.Add(name))
                         {
                             dt.Rows.Add(name);
                         }
                     }
-                    DataView dvMaster = dt.DefaultView;
-                    dvMaster.Sort = "COLLEGE_NAME ASC";
-                    return dvMaster.ToTable();
                 }
             }
             catch { }
 
-            // 2. Fallback to standard catalog only if EDU_COLLEGE table is not yet populated
+            // 2. Standard and prominent catalog (fallback & baseline institutions)
             string[] standardColleges = new string[]
             {
                 // Premier Engineering Colleges (Karnataka & India)
@@ -1960,6 +2031,14 @@ namespace EducationApp.Utils
                 "Birla Institute of Technology (BIT), Mesra, Ranchi",
                 "Manipal Institute of Technology (MIT), Manipal",
 
+                // Seshadripuram Educational Trust Institutions
+                "Seshadripuram College, Bengaluru",
+                "Seshadripuram First Grade College (SFGC), Yelahanka, Bengaluru",
+                "Seshadripuram Institute of Commerce and Management (SICM), Bengaluru",
+                "Seshadripuram Academy of Business Studies (SABS), Kengeri, Bengaluru",
+                "Seshadripuram Evening College, Bengaluru",
+                "Seshadripuram Pre-University College, Bengaluru",
+
                 // Degree, Science, Arts & Commerce Colleges
                 "St. Aloysius College (Autonomous), Mangaluru",
                 "St. Agnes College (Autonomous), Mangaluru",
@@ -1972,6 +2051,15 @@ namespace EducationApp.Utils
                 "Mount Carmel College (MCC), Bengaluru",
                 "National College, Basavanagudi, Bengaluru",
                 "MES College of Arts, Commerce and Science, Bengaluru",
+                "MES Degree College of Arts, Commerce and Science, Malleshwaram, Bengaluru",
+                "Vijaya College, Basavanagudi, Bengaluru",
+                "BMS College of Commerce & Management, Bengaluru",
+                "Kristu Jayanti College (Autonomous), Bengaluru",
+                "Presidency College, Hebbal, Bengaluru",
+                "Jyoti Nivas College (Autonomous), Bengaluru",
+                "Acharya Bangalore B-School (ABBS), Bengaluru",
+                "KLE Society's S. Nijalingappa College, Rajajinagar, Bengaluru",
+                "The Oxford College of Science / Arts / Commerce, Bengaluru",
                 "St. Xavier's College, Mumbai",
                 "Loyola College, Chennai",
                 "Madras Christian College (MCC), Chennai",
@@ -2523,7 +2611,7 @@ namespace EducationApp.Utils
                         new OracleParameter("CGPA", finalScore),
                         new OracleParameter("GRD", grade),
                         new OracleParameter("HIGH", isHighest ? 1 : 0),
-                        new OracleParameter("REM", "Migrated from " + legTable + " (CTREDN: " + ctredn + ")"),
+                        new OracleParameter("REM", DBNull.Value),
                         new OracleParameter("ST", rowStatus),
                         new OracleParameter("USR", executedBy),
                         new OracleParameter("CTR", ctredn));

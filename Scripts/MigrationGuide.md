@@ -223,37 +223,38 @@ SELECT * FROM EDU_MIGRATION_LOG ORDER BY MIGRATION_DATE DESC;
 
 ---
 
-### 4.4 `04_Auto_Sync_Trigger.sql` — Keeping Data in Sync Forever
+### 4.4 `04_Auto_Sync_Trigger.sql` — Real-Time Sync for New Entries Only
 
-**What it does:** Creates a database trigger (`TRG_SYNC_HR_EMP_EDU`) on the **old** `HR_EMP_EDUCATION` table. After this trigger is active, any time someone inserts or updates a record in the old HR system, it **automatically reflects in the new `EDU_EMP_EDUCATION` table** in real time.
+**What it does:** Creates a database trigger (`TRG_SYNC_HR_EMP_EDU`) on the **old** `HR_EMP_EDUCATION` table. It fires **ONLY when a brand-new entry is inserted** (`AFTER INSERT`). If existing data in the old database is updated or changed, the trigger **does NOT fire or alter any records**.
 
 **Run when:**
-- Only if the old HR system (`HR_EMP_EDUCATION`) is still actively being used alongside this new application
-- **Do not run** if HR_EMP_EDUCATION no longer exists or is no longer maintained
+- Only if the old HR system (`HR_EMP_EDUCATION`) is still actively being used and you want newly added employee qualifications to automatically flow into this portal as `Draft` records.
+- **Do not run** if `HR_EMP_EDUCATION` is retired or no longer updated.
 
 **Why this is useful:**
 
-If your HR department still updates education records in the old system while employees start using this new system, this trigger ensures both tables stay in sync without any manual effort.
+If your HR team enters new qualifications in the legacy database, those new records appear in the portal automatically without overwriting or interfering with any existing, submitted, or edited records.
 
 **How it works:**
 
 ```
-AFTER INSERT OR UPDATE on HR_EMP_EDUCATION (fires for each row):
+AFTER INSERT on HR_EMP_EDUCATION (fires only on new rows):
   1. Check if employee PCNO exists in hrdata.empdetails (if not found, do not import - exit immediately)
-  2. Resolve qualification code using EDU_QUAL_MAPPING
-  3. Resolve university name using EDU_UNIVERSITY
-  4. Resolve subject/specialization using EDU_SUBJECT & map to EDU_QUAL_SUB (resolves both SPECIALIZATION and QUAL_SUB_CODE/QUAL_SUB_NAME)
-  5. Fetch employee details from hrdata.empdetails
-  6. If record already exists in EDU_EMP_EDUCATION → UPDATE it (preserves existing status)
-  7. If record does not exist → INSERT it with STATUS = 'Draft' (allows employee to review, verify, and submit)
+  2. Check if this record already exists in EDU_EMP_EDUCATION (if OLD_CTREDN exists, exit immediately - do not overwrite)
+  3. Resolve qualification code using EDU_QUAL_MAPPING
+  4. Resolve university name using EDU_UNIVERSITY
+  5. Resolve subject/specialization using EDU_SUBJECT & map to EDU_QUAL_SUB
+  6. Fetch employee details from hrdata.empdetails
+  7. INSERT new row into EDU_EMP_EDUCATION with STATUS = 'Draft' (allows employee to review, verify, and submit)
 ```
 
 **Important difference from Script 03:**
 
 | | Script 03 (Procedure) | Script 04 (Trigger) |
 |---|---|---|
-| When it runs | You manually call it once | Runs automatically on every INSERT/UPDATE |
-| Use case | One-time bulk import | Ongoing live sync |
+| When it runs | You manually call it once | Runs automatically on every NEW INSERT |
+| Existing record edits | Can be re-run on demand | Never fires on updates / changes to existing data |
+| Use case | One-time bulk historical import | Ongoing capture of newly added entries |
 | Can be stopped | Yes, just don't call it | Only by disabling/dropping the trigger |
 
 **To disable the trigger temporarily:**

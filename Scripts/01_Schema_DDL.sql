@@ -4,6 +4,7 @@
 -- SCRIPT: 01_Schema_DDL.sql
 -- DESCRIPTION: Tables, Sequences, Triggers and Indexes for Oracle 11g
 -- ========================================================================
+SET DEFINE OFF;
 
 -- Safe cleanup (optional for fresh setups)
 -- DROP TABLE EDU_AUDIT_LOG CASCADE CONSTRAINTS;
@@ -101,7 +102,7 @@ BEGIN
 END;
 /
 
--- 5b. COLLEGES & SCHOOLS TABLE
+-- 5b. COLLEGES AND SCHOOLS TABLE
 CREATE TABLE EDU_COLLEGE (
     COLLEGE_ID NUMBER NOT NULL,
     COLLEGE_NAME VARCHAR2(250) NOT NULL,

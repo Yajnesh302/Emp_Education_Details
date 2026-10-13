@@ -13,12 +13,12 @@
     <link href="Static/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css" />
     <link href="Static/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
     <link href="Static/css/sb-admin-2.min.css" rel="stylesheet" type="text/css" />
-    <link href="Static/css/custom-education.css?v=20261013_31" rel="stylesheet" type="text/css" />
+    <link href="Static/css/custom-education.css?v=20261013_33" rel="stylesheet" type="text/css" />
 
     <!-- Core Local Offline JS Assets in Head for Guaranteed Early Availability -->
     <script src="Static/jquery/jquery.min.js"></script>
     <script src="Static/bootstrap/js/bootstrap.bundle.min.js"></script>
-    <script src="Static/js/education-app.js?v=20261013_31"></script>
+    <script src="Static/js/education-app.js?v=20261013_33"></script>
 
     <asp:ContentPlaceHolder ID="HeadContent" runat="server">
     </asp:ContentPlaceHolder>
@@ -152,6 +152,43 @@
                         </button>
                         <button type="button" class="btn btn-edu-success font-weight-bold px-4 py-2 shadow-sm" id="btnConfirmCautionSubmit" style="border-radius: 8px; min-width: 175px;">
                             <i class="fas fa-lock mr-1"></i> Yes, Submit &amp; Lock
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Universal Modern Confirmation & Alert Dialog (Replaces native browser alert/confirm) -->
+        <div id="appConfirmModal" class="submit-caution-backdrop" role="dialog" aria-modal="true" aria-labelledby="appConfirmTitle">
+            <div class="custom-modal-dialog" style="max-width: 480px; margin: auto;">
+                <div class="custom-modal-content caution-modal-content text-center p-4 shadow-lg" style="border-radius: 18px; border: 1.5px solid #e2e8f0; background: #ffffff;">
+                    <!-- Dynamically Themed Icon Badge -->
+                    <div id="appConfirmIconWrap" class="mx-auto mb-3" style="width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;">
+                        <i id="appConfirmIcon" class="fas fa-exclamation-triangle" style="font-size: 2rem;"></i>
+                    </div>
+
+                    <!-- Title -->
+                    <h4 id="appConfirmTitle" class="font-weight-bold text-gray-900 mb-2" style="font-size: 1.3rem;">
+                        Confirmation Required
+                    </h4>
+
+                    <!-- Optional Highlight Callout -->
+                    <div id="appConfirmCallout" class="alert py-2 px-3 mb-3 text-left small font-weight-bold" style="border-radius: 10px; display: none;">
+                        <i id="appConfirmCalloutIcon" class="fas fa-info-circle mr-1"></i>
+                        <span id="appConfirmCalloutText"></span>
+                    </div>
+
+                    <!-- Message Body -->
+                    <p class="text-muted small mb-4" id="appConfirmMessageText" style="line-height: 1.55; font-size: 0.92rem;">
+                    </p>
+
+                    <!-- Actions -->
+                    <div class="d-flex justify-content-center align-items-center" style="gap: 12px;" id="appConfirmActions">
+                        <button type="button" class="btn btn-light border font-weight-bold px-3 py-2 text-secondary" id="btnAppConfirmCancel" style="border-radius: 8px; min-width: 105px;">
+                            <i class="fas fa-times mr-1"></i> Cancel
+                        </button>
+                        <button type="button" class="btn font-weight-bold px-4 py-2 shadow-sm text-white" id="btnAppConfirmOk" style="border-radius: 8px; min-width: 140px;">
+                            <i class="fas fa-check mr-1"></i> Confirm
                         </button>
                     </div>
                 </div>

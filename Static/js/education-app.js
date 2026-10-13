@@ -160,6 +160,7 @@
             // Sync hidden fields before postback
             $('input[id$="hfSelectedMainQual"]').val($('select[id$="ddlMainQual"]').val() || '');
             $('input[id$="hfSelectedSubQual"]').val($('select[id$="ddlSubQual"]').val() || '');
+            $('input[id$="hfSelectedSubQualName"]').val($('select[id$="ddlSubQual"]').find('option:selected').text() || '');
             return true;
         },
 
@@ -174,6 +175,7 @@
             $('[id$="hfEditEduId"]').val('0');
             $('[id$="hfSelectedMainQual"]').val('');
             $('[id$="hfSelectedSubQual"]').val('');
+            $('[id$="hfSelectedSubQualName"]').val('');
 
             // Reset modal title
             $('[id$="litModalTitle"], #lblModalTitleText').text('Add Qualification Record');
@@ -707,7 +709,7 @@
                     $.each(allOptions, function (i, opt) {
                         if (!opt.value) return;
 
-                        var isUniversal = (opt.value === 'OTHER' || opt.value === 'GENERAL' || opt.value === 'NA');
+                        var isUniversal = (opt.value === 'OTHER' || opt.value === 'GENERAL');
                         var optNorm = normalizeQualCode(opt.mainCode);
                         var isDirectMatch = (opt.mainCode === rawSelected || (optNorm && optNorm === selectedNorm));
                         var isFamilyMatch = (optNorm && allowedMains.indexOf(optNorm) !== -1);
@@ -755,8 +757,9 @@
                     $sub.val(currentSubVal);
                 }
 
-                // Sync to hidden field
+                // Sync to hidden fields
                 $('input[id$="hfSelectedSubQual"]').val($sub.val() || '');
+                $('input[id$="hfSelectedSubQualName"]').val($sub.find('option:selected').text() || '');
 
                 // Refresh searchable dropdown for sub qualification
                 if ($sub.data('searchable-initialized')) {
@@ -777,6 +780,7 @@
             $sub.off('change.cascade').on('change.cascade', function () {
                 var sVal = $(this).val();
                 $('input[id$="hfSelectedSubQual"]').val(sVal);
+                $('input[id$="hfSelectedSubQualName"]').val($(this).find('option:selected').text() || '');
                 EduApp.clearModalError();
             });
 
@@ -807,8 +811,15 @@
             return true;
         },
 
-        confirmRevert: function (employeePcno) {
-            return confirm("REVERT TO DRAFT:\n\nThis will unlock education records for PCNO: " + employeePcno + ", allowing the employee to edit or update their details.\n\nProceed with unlocking?");
+        confirmRevert: function (employeePcno, onProceed) {
+            EduApp.showConfirmDialog({
+                title: "Revert Records to Draft",
+                message: "This will unlock education records for PCNO: <strong>" + employeePcno + "</strong>, allowing the employee to edit or update their details.",
+                type: "warning",
+                confirmBtnText: "Yes, Revert to Draft",
+                onConfirm: onProceed
+            });
+            return false;
         },
 
         filterTable: function (inputId, tableId) {
@@ -911,7 +922,175 @@
         hideSubmitCaution: function () {
             $('#submitCautionModal').removeClass('active');
             EduApp._pendingSubmitTrigger = null;
+        },
+
+        /**
+         * Universal Modern Confirmation Dialog (Replaces native browser confirm)
+         */
+        showConfirmDialog: function (options) {
+            var opts = options || {};
+            var title = opts.title || "Confirmation Required";
+            var msg = opts.message || "Are you sure you want to proceed with this action?";
+            var type = opts.type || "warning"; // 'danger' | 'warning' | 'success' | 'info'
+            var confirmText = opts.confirmBtnText || "Yes, Confirm";
+            var cancelText = opts.cancelBtnText || "Cancel";
+
+            var $modal = $('#appConfirmModal');
+            if ($modal.length === 0) {
+                if (window.confirm(msg)) {
+                    if (typeof opts.onConfirm === 'function') opts.onConfirm();
+                }
+                return;
+            }
+
+            $('#appConfirmTitle').text(title);
+            $('#appConfirmMessageText').html(msg);
+
+            var $callout = $('#appConfirmCallout');
+            if (opts.callout) {
+                $('#appConfirmCalloutText').html(opts.callout);
+                $callout.show();
+            } else {
+                $callout.hide();
+            }
+
+            var $iconWrap = $('#appConfirmIconWrap');
+            var $icon = $('#appConfirmIcon');
+            var $btnOk = $('#btnAppConfirmOk');
+            var $btnCancel = $('#btnAppConfirmCancel');
+
+            $btnCancel.show().html('<i class="fas fa-times mr-1"></i> ' + cancelText);
+            $btnOk.html('<i class="fas fa-check mr-1"></i> ' + confirmText);
+
+            $btnOk.removeClass('btn-danger btn-warning btn-success btn-primary btn-edu-success text-dark');
+
+            if (type === 'danger') {
+                $iconWrap.css({ 'background': '#fee2e2', 'box-shadow': '0 0 0 8px rgba(254, 226, 226, 0.65)' });
+                $icon.attr('class', 'fas fa-trash-alt text-danger');
+                $btnOk.addClass('btn-danger');
+            } else if (type === 'success') {
+                $iconWrap.css({ 'background': '#dcfce7', 'box-shadow': '0 0 0 8px rgba(220, 252, 231, 0.65)' });
+                $icon.attr('class', 'fas fa-check-circle text-success');
+                $btnOk.addClass('btn-edu-success');
+            } else if (type === 'info') {
+                $iconWrap.css({ 'background': '#e0f2fe', 'box-shadow': '0 0 0 8px rgba(224, 242, 254, 0.65)' });
+                $icon.attr('class', 'fas fa-info-circle text-primary');
+                $btnOk.addClass('btn-primary');
+            } else {
+                // warning
+                $iconWrap.css({ 'background': '#fef3c7', 'box-shadow': '0 0 0 8px rgba(254, 243, 199, 0.65)' });
+                $icon.attr('class', 'fas fa-exclamation-triangle text-warning');
+                $btnOk.addClass('btn-warning text-dark font-weight-bold');
+            }
+
+            EduApp._pendingConfirmCallback = opts.onConfirm;
+            $modal.addClass('active');
+        },
+
+        /**
+         * Universal Modern Alert Dialog (Replaces native browser alert)
+         */
+        showAlertDialog: function (options) {
+            var opts = options || {};
+            var title = opts.title || "Attention";
+            var msg = opts.message || "";
+            var type = opts.type || "warning";
+            var btnText = opts.btnText || "Understood";
+
+            EduApp.showConfirmDialog({
+                title: title,
+                message: msg,
+                type: type,
+                confirmBtnText: btnText,
+                onConfirm: opts.onClose
+            });
+
+            // Hide cancel button for pure notification/alert
+            $('#btnAppConfirmCancel').hide();
+        },
+
+        hideConfirmDialog: function () {
+            $('#appConfirmModal').removeClass('active');
+            EduApp._pendingConfirmCallback = null;
         }
+    };
+
+    // Global Modal Confirmation Event Handlers
+    $(document).on('click', '#btnAppConfirmCancel', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        EduApp.hideConfirmDialog();
+    });
+
+    $(document).on('click', '#btnAppConfirmOk', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var callback = EduApp._pendingConfirmCallback;
+        EduApp.hideConfirmDialog();
+        if (typeof callback === 'function') {
+            callback();
+        }
+    });
+
+    $(document).on('click', '#appConfirmModal', function (e) {
+        if (e.target === this) {
+            EduApp.hideConfirmDialog();
+        }
+    });
+
+    $(document).on('keydown', function (e) {
+        if (e.key === 'Escape' && $('#appConfirmModal').hasClass('active')) {
+            EduApp.hideConfirmDialog();
+        }
+    });
+
+    // Universal interceptor for all data-confirm actions (Replaces inline confirm popups)
+    $(document).on('click', '[data-confirm]', function (e) {
+        if (this.__confirmed) {
+            this.__confirmed = false;
+            return true;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        var trigger = this;
+        var msg = $(this).attr('data-confirm');
+        var title = $(this).attr('data-confirm-title') || 'Confirm Action';
+        var type = $(this).attr('data-confirm-type') || 'warning';
+        var btnText = $(this).attr('data-confirm-btn') || 'Yes, Confirm';
+        var callout = $(this).attr('data-confirm-callout') || '';
+
+        EduApp.showConfirmDialog({
+            title: title,
+            message: msg,
+            callout: callout,
+            type: type,
+            confirmBtnText: btnText,
+            onConfirm: function () {
+                trigger.__confirmed = true;
+                if (typeof trigger.click === 'function') {
+                    trigger.click();
+                } else if ($(trigger).is('a')) {
+                    var href = $(trigger).attr('href');
+                    if (href && href.indexOf('javascript:') === 0) {
+                        window.location.href = href;
+                    }
+                }
+            }
+        });
+
+        return false;
+    });
+
+    // Modernize window.alert to seamlessly redirect through the custom alert dialog
+    window.alert = function (message) {
+        EduApp.showAlertDialog({
+            title: "Notification",
+            message: message,
+            type: "info",
+            btnText: "OK"
+        });
     };
 
     // Caution Confirmation Modal Handlers
@@ -973,12 +1152,18 @@
             // Sync hidden fields
             $('input[id$="hfSelectedMainQual"]').val($('select[id$="ddlMainQual"]').val() || '');
             $('input[id$="hfSelectedSubQual"]').val($('select[id$="ddlSubQual"]').val() || '');
+            $('input[id$="hfSelectedSubQualName"]').val($('select[id$="ddlSubQual"]').find('option:selected').text() || '');
         } else {
             // Final submission from banner or bottom button
-            // If there are records flagged with incomplete placeholders on page, block immediately
+            // If there are records flagged with Details Pending, inform user cleanly
             if ($('.badge-record-incomplete').length > 0) {
                 e.preventDefault();
-                alert("Submission Blocked: You have draft qualification records containing placeholder values (such as '*'). Please click 'Edit' on each flagged record and select proper qualifications, college/school, university, and passing year before submitting.");
+                EduApp.showAlertDialog({
+                    title: "Verification Required",
+                    message: "You have qualification records tagged with <strong>'Details Pending'</strong>.<br><br>Please click <strong>Edit</strong> on those entries to complete all required details before submitting.",
+                    type: "warning",
+                    btnText: "Understood, Review Records"
+                });
                 return false;
             }
         }
@@ -1014,41 +1199,83 @@
     });
 
     /**
-     * Non-blocking intranet employee photo loader with strict 1500ms timeout.
-     * Prevents browser hangs/freezes when operating outside the company intranet.
+     * Non-blocking intranet employee photo loader with smart caching and stable fallback.
+     * Prevents browser hangs/freezes outside intranet while guaranteeing photos never disappear.
      */
     EduApp.initIntranetPhotos = function () {
+        window._empPhotoCache = window._empPhotoCache || {};
+
         $('img[data-intranet-photo]').each(function () {
             var $img = $(this);
             var url = $img.attr('data-intranet-photo');
             if (!url) return;
 
+            // If image is already actively displaying this photo, do nothing
+            if ($img.attr('src') === url) {
+                return;
+            }
+
+            // Check in-memory or sessionStorage cache
+            var cached = window._empPhotoCache[url];
+            if (!cached && window.sessionStorage) {
+                try {
+                    cached = sessionStorage.getItem('emp_photo_status_' + url);
+                } catch (e) {}
+            }
+
+            if (cached === 'ok') {
+                $img.attr('src', url);
+                return;
+            } else if (cached === 'fail') {
+                // Verified unreachable, keep default avatar
+                return;
+            }
+
+            // Probe non-blockingly with generous 4-second network window
             var probe = new Image();
-            var timedOut = false;
             var timer = setTimeout(function () {
-                timedOut = true;
-                probe.src = '';
-            }, 1500);
+                window._empPhotoCache[url] = 'fail';
+            }, 4000);
 
             probe.onload = function () {
-                if (!timedOut) {
-                    clearTimeout(timer);
-                    $img.attr('src', url);
+                clearTimeout(timer);
+                window._empPhotoCache[url] = 'ok';
+                if (window.sessionStorage) {
+                    try { sessionStorage.setItem('emp_photo_status_' + url, 'ok'); } catch (e) {}
                 }
+                $img.attr('src', url);
             };
+
             probe.onerror = function () {
-                if (!timedOut) {
-                    clearTimeout(timer);
+                clearTimeout(timer);
+                window._empPhotoCache[url] = 'fail';
+                if (window.sessionStorage) {
+                    try { sessionStorage.setItem('emp_photo_status_' + url, 'fail'); } catch (e) {}
                 }
             };
+
             probe.src = url;
         });
     };
+
+    function setupPartialPostbackHandlers() {
+        if (typeof Sys !== 'undefined' && Sys.WebForms && Sys.WebForms.PageRequestManager) {
+            var prm = Sys.WebForms.PageRequestManager.getInstance();
+            if (!prm._eduAppEndRequestBound) {
+                prm.add_endRequest(function () {
+                    EduApp.initAllSearchable();
+                    EduApp.initIntranetPhotos();
+                });
+                prm._eduAppEndRequestBound = true;
+            }
+        }
+    }
 
     // Auto-initialize all searchable dropdowns and intranet photos on page ready
     $(document).ready(function () {
         EduApp.initAllSearchable();
         EduApp.initIntranetPhotos();
+        setupPartialPostbackHandlers();
 
         // Close modal on backdrop click
         $(document).on('click', '.custom-modal-backdrop', function (e) {
@@ -1067,13 +1294,5 @@
             }
         });
     });
-
-    // Support for ASP.NET AJAX partial postbacks if present
-    if (typeof Sys !== 'undefined' && Sys.WebForms && Sys.WebForms.PageRequestManager) {
-        Sys.WebForms.PageRequestManager.getInstance().add_endRequest(function () {
-            EduApp.initAllSearchable();
-            EduApp.initIntranetPhotos();
-        });
-    }
 
 })(jQuery);

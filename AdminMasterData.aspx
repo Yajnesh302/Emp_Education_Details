@@ -236,7 +236,10 @@
                                                                 <i class="fas fa-pen"></i> Edit
                                                             </asp:LinkButton>
                                                             <asp:LinkButton ID="btnDeleteMain" runat="server" CommandName="DeleteRow" CommandArgument='<%# Eval("QUAL_CODE") %>'
-                                                                OnClientClick="if (!confirm('Are you sure you want to delete this qualification?')) return false;"
+                                                                data-confirm="Are you sure you want to permanently delete this qualification entry?"
+                                                                data-confirm-title="Delete Qualification"
+                                                                data-confirm-type="danger"
+                                                                data-confirm-btn="Yes, Delete Qualification"
                                                                 CssClass="btn-action btn-action-delete" ToolTip="Delete Qualification">
                                                                 <i class="fas fa-trash-alt"></i> Delete
                                                             </asp:LinkButton>
@@ -269,7 +272,7 @@
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label-custom">Sub Code <span class="req">*</span></label>
-                                        <asp:TextBox ID="txtSubCode" runat="server" CssClass="form-control form-control-custom" placeholder="e.g. COMPS, DMECH, E&C"></asp:TextBox>
+                                        <asp:TextBox ID="txtSubCode" runat="server" CssClass="form-control form-control-custom" placeholder="e.g. COMPS, DMECH, EC"></asp:TextBox>
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label-custom">Sub Qualification Name / Stream <span class="req">*</span></label>
@@ -316,7 +319,10 @@
                                                                 <i class="fas fa-pen"></i> Edit
                                                             </asp:LinkButton>
                                                             <asp:LinkButton ID="btnDeleteSub" runat="server" CommandName="DeleteRow" CommandArgument='<%# Eval("SUB_ID") %>'
-                                                                OnClientClick="if (!confirm('Are you sure you want to delete this sub qualification?')) return false;"
+                                                                data-confirm="Are you sure you want to permanently delete this sub qualification entry?"
+                                                                data-confirm-title="Delete Sub Qualification"
+                                                                data-confirm-type="danger"
+                                                                data-confirm-btn="Yes, Delete Sub Qualification"
                                                                 CssClass="btn-action btn-action-delete" ToolTip="Delete Sub Qualification">
                                                                 <i class="fas fa-trash-alt"></i> Delete
                                                             </asp:LinkButton>
@@ -390,7 +396,10 @@
                                                                 <i class="fas fa-pen"></i> Edit
                                                             </asp:LinkButton>
                                                             <asp:LinkButton ID="btnDeleteUniv" runat="server" CommandName="DeleteRow" CommandArgument='<%# Eval("UNIV_ID") %>'
-                                                                OnClientClick="if (!confirm('Are you sure you want to delete this university?')) return false;"
+                                                                data-confirm="Are you sure you want to permanently delete this university / board entry?"
+                                                                data-confirm-title="Delete University"
+                                                                data-confirm-type="danger"
+                                                                data-confirm-btn="Yes, Delete University"
                                                                 CssClass="btn-action btn-action-delete" ToolTip="Delete University">
                                                                 <i class="fas fa-trash-alt"></i> Delete
                                                             </asp:LinkButton>
@@ -483,7 +492,10 @@
                                                                 <i class="fas fa-pen"></i> Edit
                                                             </asp:LinkButton>
                                                             <asp:LinkButton ID="btnDeleteCollege" runat="server" CommandName="DeleteRow" CommandArgument='<%# Eval("COLLEGE_ID") %>'
-                                                                OnClientClick="if (!confirm('Are you sure you want to delete this college/school?')) return false;"
+                                                                data-confirm="Are you sure you want to permanently delete this college / institute entry?"
+                                                                data-confirm-title="Delete College / Institute"
+                                                                data-confirm-type="danger"
+                                                                data-confirm-btn="Yes, Delete College"
                                                                 CssClass="btn-action btn-action-delete" ToolTip="Delete College">
                                                                 <i class="fas fa-trash-alt"></i> Delete
                                                             </asp:LinkButton>
@@ -557,7 +569,10 @@
                                                                 <i class="fas fa-pen"></i> Edit
                                                             </asp:LinkButton>
                                                             <asp:LinkButton ID="btnDeleteSubj" runat="server" CommandName="DeleteRow" CommandArgument='<%# Eval("SUBJECT_ID") %>'
-                                                                OnClientClick="if (!confirm('Are you sure you want to delete this subject?')) return false;"
+                                                                data-confirm="Are you sure you want to permanently delete this subject / trade entry?"
+                                                                data-confirm-title="Delete Subject / Trade"
+                                                                data-confirm-type="danger"
+                                                                data-confirm-btn="Yes, Delete Subject"
                                                                 CssClass="btn-action btn-action-delete" ToolTip="Delete Subject">
                                                                 <i class="fas fa-trash-alt"></i> Delete
                                                             </asp:LinkButton>
@@ -645,7 +660,10 @@
                                                             </asp:LinkButton>
                                                             <asp:LinkButton ID="btnDeleteAdmin" runat="server" CommandName="DeleteRow" CommandArgument='<%# Eval("PCNO") %>'
                                                                 Visible='<%# Eval("PCNO").ToString() != "1001" %>'
-                                                                OnClientClick="if (!confirm('Are you sure you want to permanently delete this administrator?')) return false;"
+                                                                data-confirm="Are you sure you want to permanently delete this administrator from system access?"
+                                                                data-confirm-title="Delete Administrator"
+                                                                data-confirm-type="danger"
+                                                                data-confirm-btn="Yes, Delete Administrator"
                                                                 CssClass="btn-action btn-action-delete" ToolTip="Delete Administrator">
                                                                 <i class="fas fa-trash-alt"></i> Delete
                                                             </asp:LinkButton>

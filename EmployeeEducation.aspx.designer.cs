@@ -1,7 +1,6 @@
 namespace EducationApp {
     
     public partial class EmployeeEducation {
-        
         protected global::System.Web.UI.WebControls.Image imgEmpPhoto;
         protected global::System.Web.UI.WebControls.Literal litEmpPCNO;
         protected global::System.Web.UI.WebControls.Literal litEmpName;
@@ -16,7 +15,7 @@ namespace EducationApp {
         protected global::System.Web.UI.WebControls.PlaceHolder phDraftIncompleteNotice;
         protected global::System.Web.UI.WebControls.Literal litDraftIncompleteCount;
         protected global::System.Web.UI.WebControls.Literal litDraftIncompleteDetails;
-        protected global::System.Web.UI.WebControls.Button btnFinalSubmitBanner;
+        protected global::System.Web.UI.WebControls.Literal litCardQualCount;
         protected global::System.Web.UI.WebControls.Button btnOpenAddModal;
         protected global::System.Web.UI.WebControls.GridView gvEducation;
         protected global::System.Web.UI.WebControls.PlaceHolder phBottomSubmitBtn;
@@ -26,8 +25,10 @@ namespace EducationApp {
         protected global::System.Web.UI.WebControls.LinkButton btnCloseModalX;
         protected global::System.Web.UI.ScriptManager smEducation;
         protected global::System.Web.UI.UpdatePanel upEducation;
+        protected global::System.Web.UI.UpdatePanel upSidebarStats;
         protected global::System.Web.UI.WebControls.HiddenField hfSelectedMainQual;
         protected global::System.Web.UI.WebControls.HiddenField hfSelectedSubQual;
+        protected global::System.Web.UI.WebControls.HiddenField hfSelectedSubQualName;
         protected global::System.Web.UI.WebControls.HiddenField hfEditEduId;
         protected global::System.Web.UI.WebControls.Panel pnlFormError;
         protected global::System.Web.UI.WebControls.Literal litFormError;

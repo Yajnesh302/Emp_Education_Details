@@ -39,8 +39,10 @@ namespace EducationApp
 
                 if (imgNavAvatar != null)
                 {
-                    imgNavAvatar.ImageUrl = "Static/Images/default_avatar.png";
-                    imgNavAvatar.Attributes["onerror"] = "this.onerror=null; this.src='Static/Images/default_avatar.png';";
+                    string defaultAvatarUrl = ResolveUrl("~/Static/Images/default_avatar.png");
+                    imgNavAvatar.ImageUrl = defaultAvatarUrl;
+                    imgNavAvatar.Attributes["data-default-avatar"] = defaultAvatarUrl;
+                    imgNavAvatar.Attributes["onerror"] = "if (this.src !== this.getAttribute('data-default-avatar')) { this.src = this.getAttribute('data-default-avatar'); }";
 
                     bool enableIntranetPhotos = string.Equals(ConfigurationManager.AppSettings["EnableIntranetPhotos"], "true", StringComparison.OrdinalIgnoreCase);
                     if (enableIntranetPhotos && !string.IsNullOrEmpty(pcno) && pcno != "---")

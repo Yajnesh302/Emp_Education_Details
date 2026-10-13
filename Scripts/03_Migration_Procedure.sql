@@ -5,6 +5,7 @@
 -- DESCRIPTION: Automated, Configurable PL/SQL Migration from HR_EMP_EDUCATION
 --              to EDU_EMP_EDUCATION without altering original table.
 -- ========================================================================
+SET DEFINE OFF;
 
 -- OPTIONAL: Explicitly drop existing package if you want a fresh start
 -- (Note: CREATE OR REPLACE will automatically overwrite it anyway)
@@ -71,6 +72,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_EDU_MIGRATION AS
         v_exists         NUMBER;
         v_emp_found      NUMBER := 0;
         v_row_status     VARCHAR2(20);
+        v_err_msg        VARCHAR2(4000);
         
     BEGIN
         -- Log entry
@@ -168,7 +170,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_EDU_MIGRATION AS
                         END;
                     END IF;
 
-                    -- 3. Resolve Subject / Specialization & Sub-Qualification
+                    -- 3. Resolve Subject / Specialization and Sub-Qualification
                     -- In legacy HR_EMP_EDUCATION, there is no separate SUB_QUALIFICATION column.
                     -- Legacy branch/discipline was recorded in SUBJECTID (referencing EDU_SUBJECT).
                     v_spec := 'General';
@@ -270,7 +272,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_EDU_MIGRATION AS
                     NVL(TO_CHAR(v_percentage), 'N/A'),
                     NVL(v_grade, 'Pass'),
                     v_is_highest,
-                    'Migrated from ' || v_source_tbl || ' (CTREDN: ' || v_ctredn || ')',
+                    NULL,
                     v_row_status,
                     CASE WHEN v_row_status = 'Submitted' THEN SYSDATE ELSE NULL END,
                     SYSDATE,
@@ -307,20 +309,28 @@ CREATE OR REPLACE PACKAGE BODY PKG_EDU_MIGRATION AS
 
     EXCEPTION
         WHEN OTHERS THEN
+            v_err_msg := SUBSTR(SQLERRM, 1, 3900);
             IF c_old_data%ISOPEN THEN
                 CLOSE c_old_data;
             END IF;
             ROLLBACK;
             UPDATE EDU_MIGRATION_LOG
             SET STATUS = 'FAILED',
-                LOG_DETAILS = 'Error: ' || SQLERRM
+                LOG_DETAILS = 'Error: ' || v_err_msg
             WHERE LOG_ID = v_log_id;
             COMMIT;
             p_out_total_read := v_total_read;
             p_out_migrated   := v_total_migrated;
             p_out_skipped    := v_total_skipped;
-            p_out_message    := 'Error during migration: ' || SQLERRM;
+            p_out_message    := 'Error during migration: ' || v_err_msg;
     END SP_RUN_MIGRATION;
 
 END PKG_EDU_MIGRATION;
 /
+
+-- Clean up imported remarks from any previously migrated records
+UPDATE EDU_EMP_EDUCATION 
+SET REMARKS = NULL 
+WHERE REMARKS LIKE 'Migrated from%' OR REMARKS LIKE 'Auto-synced%';
+COMMIT;
+

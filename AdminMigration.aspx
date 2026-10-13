@@ -109,7 +109,11 @@
                     <div class="badge badge-success p-2"><i class="fas fa-check-circle mr-1"></i> Configurable Mappings Ready (e.g. SSLC -> 10th MTRI)</div>
                 </div>
                 <div class="col-md-3 text-md-right">
-                    <asp:Button ID="btnRunMigration" runat="server" Text="Execute Import Now" CssClass="btn btn-edu-primary btn-block font-weight-bold py-2" OnClick="btnRunMigration_Click" OnClientClick="return confirm('Start importing historical records into the system?');" />
+                    <asp:Button ID="btnRunMigration" runat="server" Text="Execute Import Now" CssClass="btn btn-edu-primary btn-block font-weight-bold py-2" OnClick="btnRunMigration_Click"
+                        data-confirm="Start importing historical qualification records into the system? This will migrate existing employee educational records into the portal database."
+                        data-confirm-title="Execute Data Import"
+                        data-confirm-type="warning"
+                        data-confirm-btn="Yes, Execute Import" />
                 </div>
             </div>
 

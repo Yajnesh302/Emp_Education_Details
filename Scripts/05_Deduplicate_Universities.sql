@@ -2,7 +2,7 @@
 -- APPLICATION: EMPLOYEE EDUCATION MANAGEMENT SYSTEM
 -- TARGET DATABASE: ORACLE 11g R2 / 12c+ / 19c+
 -- SCRIPT: 05_Deduplicate_Universities.sql
--- DESCRIPTION: Deduplicates university & institution catalog in EDU_UNIVERSITY
+-- DESCRIPTION: Deduplicates university and institution catalog in EDU_UNIVERSITY
 --              and harmonizes existing employee records in EDU_EMP_EDUCATION.
 --              Specifically consolidates abbreviation/full-name duplicates
 --              such as VTU, JNTU, IGNOU, CBSE, ICSE, IITs, NITs, etc.
@@ -23,7 +23,7 @@ SET UNIV_NAME = 'Visvesvaraya Technological University (VTU), Belagavi',
     IS_ACTIVE = 1
 WHERE UNIV_ID = 129;
 
--- Premier Institutes & Universities Canonical Standardization
+-- Premier Institutes and Universities Canonical Standardization
 UPDATE EDU_UNIVERSITY SET UNIV_NAME = 'Anna University, Chennai' WHERE UNIV_ID = 1;
 UPDATE EDU_UNIVERSITY SET UNIV_NAME = 'Bangalore University, Bengaluru' WHERE UNIV_ID = 2;
 UPDATE EDU_UNIVERSITY SET UNIV_NAME = 'Andhra University, Visakhapatnam' WHERE UNIV_ID = 3;
@@ -197,7 +197,7 @@ WHERE UPPER(TRIM(INSTITUTE_NAME)) = 'BANGALORE UNIVERSITY';
 COMMIT;
 
 -- ------------------------------------------------------------------------
--- STEP 3: Remove / Deactivate Duplicate & Obsolete Abbreviations in EDU_UNIVERSITY
+-- STEP 3: Remove / Deactivate Duplicate and Obsolete Abbreviations in EDU_UNIVERSITY
 -- ------------------------------------------------------------------------
 
 -- 1. Remove obsolete standalone abbreviations that are now covered by full forms

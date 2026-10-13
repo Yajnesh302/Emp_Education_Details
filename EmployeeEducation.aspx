@@ -68,8 +68,8 @@
             overflow-y: auto;
         }
         .custom-modal-dialog {
-            width: 100%;
-            max-width: 860px;
+            width: 95%;
+            max-width: 1040px;
             margin: auto;
         }
         .custom-modal-content {
@@ -101,9 +101,7 @@
     <!-- Built-in AJAX ScriptManager for Partial Postbacks (Zero Full Page Refresh) -->
     <asp:ScriptManager ID="smEducation" runat="server" EnablePartialRendering="true" />
 
-    <!-- Asynchronous UpdatePanel to Ensure Zero Full Page Reloads on validation or modal actions -->
-    <asp:UpdatePanel ID="upEducation" runat="server" UpdateMode="Always">
-        <ContentTemplate>
+
 
     <!-- Page Header & Action Bar -->
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
@@ -113,8 +111,10 @@
             </h3>
             <p class="text-muted small mb-0">Record, review, and maintain your official educational qualifications</p>
         </div>
-        <div class="mt-2 mt-md-0">
-            <asp:Button ID="btnOpenAddModal" runat="server" Text="+ Add Qualification" CssClass="btn btn-edu-primary font-weight-bold px-3 py-2 shadow-sm" OnClientClick="EduApp.openAddModal(); return false;" OnClick="btnOpenAddModal_Click" />
+        <div class="mt-2 mt-md-0 d-flex align-items-center" style="gap: 8px;">
+            <span class="badge badge-light border text-muted px-3 py-2 font-weight-semibold shadow-xs" style="border-radius: 8px; font-size: 0.85rem;">
+                <i class="fas fa-shield-alt text-success mr-1"></i> Official Portal Record
+            </span>
         </div>
     </div>
 
@@ -158,31 +158,35 @@
 
                     <hr class="emp-side-divider" />
 
-                    <!-- Current Submission Status -->
-                    <div class="mb-3">
-                        <div class="emp-section-subtitle">
-                            <i class="fas fa-check-circle mr-1 text-primary"></i> Profile Status
-                        </div>
-                        <asp:Literal ID="litSubmissionStatusPill" runat="server"></asp:Literal>
-                    </div>
+                    <asp:UpdatePanel ID="upSidebarStats" runat="server" UpdateMode="Always">
+                        <ContentTemplate>
+                            <!-- Current Submission Status -->
+                            <div class="mb-3">
+                                <div class="emp-section-subtitle">
+                                    <i class="fas fa-check-circle mr-1 text-primary"></i> Profile Status
+                                </div>
+                                <asp:Literal ID="litSubmissionStatusPill" runat="server"></asp:Literal>
+                            </div>
 
-                    <!-- Quick Academic Stats 2-Tile Grid -->
-                    <div class="emp-metrics-grid">
-                        <div class="emp-metric-tile">
-                            <i class="fas fa-graduation-cap metric-tile-icon"></i>
-                            <div class="metric-tile-number">
-                                <asp:Literal ID="litStatQualCount" runat="server">0</asp:Literal>
+                            <!-- Quick Academic Stats 2-Tile Grid -->
+                            <div class="emp-metrics-grid">
+                                <div class="emp-metric-tile">
+                                    <i class="fas fa-graduation-cap metric-tile-icon"></i>
+                                    <div class="metric-tile-number">
+                                        <asp:Literal ID="litStatQualCount" runat="server">0</asp:Literal>
+                                    </div>
+                                    <div class="metric-tile-caption">Qualifications</div>
+                                </div>
+                                <div class="emp-metric-tile" title='<%= HighestQualTitle %>'>
+                                    <i class="fas fa-award metric-tile-icon"></i>
+                                    <div class="metric-tile-text">
+                                        <asp:Literal ID="litStatHighestQual" runat="server">None</asp:Literal>
+                                    </div>
+                                    <div class="metric-tile-caption">Highest Degree</div>
+                                </div>
                             </div>
-                            <div class="metric-tile-caption">Qualifications</div>
-                        </div>
-                        <div class="emp-metric-tile" title='<%= HighestQualTitle %>'>
-                            <i class="fas fa-award metric-tile-icon"></i>
-                            <div class="metric-tile-text">
-                                <asp:Literal ID="litStatHighestQual" runat="server">None</asp:Literal>
-                            </div>
-                            <div class="metric-tile-caption">Highest Degree</div>
-                        </div>
-                    </div>
+                        </ContentTemplate>
+                    </asp:UpdatePanel>
 
                     <!-- Add Qualification Shortcut Button -->
                     <div>
@@ -194,6 +198,11 @@
 
         <!-- RIGHT SIDE: Main Qualifications Table & Actions -->
         <div class="col-xl-9 col-lg-8 col-md-7 col-12 emp-main-content-col">
+            <asp:UpdatePanel ID="upEducation" runat="server" UpdateMode="Always">
+                <Triggers>
+                    <asp:AsyncPostBackTrigger ControlID="btnSidebarAdd" EventName="Click" />
+                </Triggers>
+                <ContentTemplate>
             <!-- Status Alerts / Guidance -->
             <asp:PlaceHolder ID="phSubmittedNotice" runat="server" Visible="false">
                 <div class="alert alert-success d-flex align-items-center mb-4 py-3 px-4 shadow-sm" style="border-radius: 12px; border-left: 5px solid #10b981; background: #ecfdf5;">
@@ -208,55 +217,63 @@
             </asp:PlaceHolder>
 
             <asp:PlaceHolder ID="phDraftNotice" runat="server" Visible="false">
-                <div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between mb-4 py-3 px-4 shadow-sm" style="border-radius: 12px; border-left: 5px solid #f59e0b; background: #fffbeb;">
-                    <div class="d-flex align-items-center mb-2 mb-md-0">
-                        <i class="fas fa-pencil-alt fa-2x text-warning mr-3 flex-shrink-0"></i>
-                        <div>
-                            <div class="font-weight-bold text-gray-900" style="font-size: 1rem;">Unsubmitted Records in Draft Mode</div>
-                            <div class="small text-muted">
-                                You have qualification records saved as draft. You can add more, edit, or remove draft entries. Click <strong>"Submit Education Details"</strong> to officially submit and lock your records.
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-2 mt-md-0 text-md-right">
-                        <asp:Button ID="btnFinalSubmitBanner" runat="server" Text="Submit Education Details" CssClass="btn btn-edu-success font-weight-bold shadow-sm px-4 btn-submit-with-caution" OnClick="btnFinalSubmit_Click" />
-                        <div class="small text-danger font-weight-bold mt-1">
-                            <i class="fas fa-exclamation-triangle mr-1"></i> Caution: Once submitted, records cannot be edited
+                <div class="alert alert-warning d-flex align-items-center mb-4 py-3 px-4 shadow-sm" style="border-radius: 12px; border-left: 5px solid #f59e0b; background: #fffbeb;">
+                    <i class="fas fa-pencil-alt fa-2x text-warning mr-3 flex-shrink-0"></i>
+                    <div>
+                        <div class="font-weight-bold text-gray-900" style="font-size: 1rem;">Unsubmitted Records in Draft Mode</div>
+                        <div class="small text-muted mt-1">
+                            You have qualification records saved as draft. Review all details, designate your <strong>Highest Qualification</strong>, and click <strong>"Submit Education Details"</strong> in the table header to officially lock and submit your profile.
                         </div>
                     </div>
                 </div>
             </asp:PlaceHolder>
 
-            <!-- Incomplete Legacy Draft Records Warning Banner -->
+            <!-- Incomplete Legacy Draft Records Notice Banner -->
             <asp:PlaceHolder ID="phDraftIncompleteNotice" runat="server" Visible="false">
-                <div class="alert alert-danger mb-4 py-3 px-4 shadow-sm" style="border-radius: 12px; border-left: 5px solid #ef4444; background: #fef2f2;">
-                    <div class="d-flex align-items-center mb-2">
-                        <i class="fas fa-exclamation-triangle fa-2x text-danger mr-3 flex-shrink-0"></i>
-                        <div>
-                            <div class="font-weight-bold text-danger" style="font-size: 1.05rem;">
-                                Action Required: <asp:Literal ID="litDraftIncompleteCount" runat="server">0</asp:Literal> Incomplete Qualification Record(s) Detected
-                            </div>
-                            <div class="small text-muted mt-1">
-                                Some records imported from the old database contain placeholder values (such as <strong>'*'</strong>). You <strong>cannot submit</strong> your education details until you click <strong>Edit</strong> (<i class="fas fa-edit"></i>) on each flagged record and select valid qualifications, college/school, university, and passing year.
-                            </div>
-                        </div>
+                <div class="alert alert-warning d-flex align-items-center mb-4 py-3 px-4 shadow-sm" style="border-radius: 12px; border-left: 5px solid #f59e0b; background: #fffdf5; border-color: #fef3c7;">
+                    <div class="mr-3 flex-shrink-0" style="width: 44px; height: 44px; border-radius: 10px; background: #fef3c7; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-file-signature text-warning" style="font-size: 1.25rem;"></i>
                     </div>
-                    <div class="small text-danger font-weight-bold mt-2 pl-4">
-                        <ul class="mb-0 pl-3">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center flex-wrap" style="gap: 8px;">
+                            <span class="font-weight-bold text-gray-900" style="font-size: 1rem;">Imported Qualifications - Verification Required</span>
+                            <span class="badge badge-warning font-weight-bold px-2 py-0.5" style="background: #fde68a; color: #92400e; font-size: 0.75rem; border-radius: 6px;">
+                                <asp:Literal ID="litDraftIncompleteCount" runat="server">0</asp:Literal> record(s) pending details
+                            </span>
+                        </div>
+                        <div class="small text-muted mt-1" style="line-height: 1.45;">
+                            Your qualification records were synced from the previous database. Some entries have missing details (such as College, Stream, or Year). Please click <strong><i class="fas fa-edit text-primary"></i> Edit</strong> on each record tagged with <em>"Details Pending"</em> below to verify and complete your details before final submission.
+                        </div>
+                        <asp:PlaceHolder ID="phDraftDetailsHidden" runat="server" Visible="false">
                             <asp:Literal ID="litDraftIncompleteDetails" runat="server"></asp:Literal>
-                        </ul>
+                        </asp:PlaceHolder>
                     </div>
                 </div>
             </asp:PlaceHolder>
 
             <!-- Education Records Table Card -->
             <div class="edu-card shadow-sm mb-4">
-        <div class="edu-card-header d-flex justify-content-between align-items-center px-4 py-3" style="padding-left: 1.25rem !important; padding-right: 1.25rem !important;">
-            <div class="edu-card-title mb-0">
-                <i class="fas fa-graduation-cap text-primary mr-2"></i> Recorded Qualifications
+        <div class="edu-card-header d-flex flex-wrap justify-content-between align-items-center px-4 py-3" style="padding-left: 1.25rem !important; padding-right: 1.25rem !important; gap: 12px;">
+            <div class="d-flex align-items-center flex-wrap" style="gap: 10px;">
+                <div class="edu-card-title mb-0">
+                    <i class="fas fa-graduation-cap text-primary mr-2"></i> Recorded Qualifications
+                </div>
+                <span class="badge badge-light border text-muted px-2 py-1 font-weight-bold" style="font-size: 0.8rem; border-radius: 6px;">
+                    <asp:Literal ID="litCardQualCount" runat="server">0</asp:Literal> Records
+                </span>
             </div>
-            <div class="small text-muted">
-                <i class="fas fa-info-circle mr-1"></i> Ensure all qualifications from 10th Standard onwards are recorded
+
+            <!-- Unified Action Area (Single Clean Action Point) -->
+            <div class="d-flex align-items-center flex-wrap" style="gap: 10px;">
+                <asp:Button ID="btnOpenAddModal" runat="server" Text="+ Add Qualification" CssClass="btn btn-edu-primary font-weight-bold px-3 py-2 shadow-xs" OnClientClick="EduApp.openAddModal(); return false;" OnClick="btnOpenAddModal_Click" />
+                <asp:PlaceHolder ID="phBottomSubmitBtn" runat="server" Visible="false">
+                    <div class="d-inline-flex align-items-center" style="gap: 8px;">
+                        <asp:Button ID="btnBottomFinalSubmit" runat="server" Text="Submit Education Details" CssClass="btn btn-edu-success font-weight-bold shadow-sm px-3 py-2 btn-submit-with-caution" OnClick="btnFinalSubmit_Click" />
+                        <span class="edu-lock-indicator" title="Once submitted, records are permanently locked and cannot be edited">
+                            <i class="fas fa-lock"></i> Locked on submit
+                        </span>
+                    </div>
+                </asp:PlaceHolder>
             </div>
         </div>
         <div class="edu-card-body p-0">
@@ -321,17 +338,29 @@
                                         <asp:LinkButton ID="btnEdit" runat="server" CommandName="EditRecord" CommandArgument='<%# Eval("EDU_ID") %>' CssClass="btn btn-sm btn-outline-primary mr-1" ToolTip="Edit Record">
                                             <i class="fas fa-edit"></i>
                                         </asp:LinkButton>
-                                        <asp:LinkButton ID="btnDelete" runat="server" CommandName="DeleteRecord" CommandArgument='<%# Eval("EDU_ID") %>' CssClass="btn btn-sm btn-outline-danger mr-1" ToolTip="Delete Record" OnClientClick="return confirm('Are you sure you want to delete this qualification record?');">
+                                        <asp:LinkButton ID="btnDelete" runat="server" CommandName="DeleteRecord" CommandArgument='<%# Eval("EDU_ID") %>' CssClass="btn btn-sm btn-outline-danger mr-1" ToolTip="Delete Record"
+                                            data-confirm="Are you sure you want to permanently delete this qualification record? This action cannot be undone."
+                                            data-confirm-title="Delete Qualification Record"
+                                            data-confirm-type="danger"
+                                            data-confirm-btn="Yes, Delete Record">
                                             <i class="fas fa-trash-alt"></i>
                                         </asp:LinkButton>
                                     </asp:PlaceHolder>
                                     <asp:PlaceHolder ID="phAdminRevert" runat="server" Visible='<%# UserSession.IsAdmin && Eval("STATUS").ToString() == "Submitted" %>'>
-                                        <asp:LinkButton ID="btnAdminRevert" runat="server" CommandName="AdminRevert" CommandArgument='<%# Eval("EDU_ID") %>' CssClass="btn btn-sm btn-outline-warning mr-1" ToolTip="Admin: Revert to Draft" OnClientClick="return confirm('Admin: Revert this record to Draft mode?');">
+                                        <asp:LinkButton ID="btnAdminRevert" runat="server" CommandName="AdminRevert" CommandArgument='<%# Eval("EDU_ID") %>' CssClass="btn btn-sm btn-outline-warning mr-1" ToolTip="Admin: Revert to Draft"
+                                            data-confirm="Revert this record to Draft mode? The employee will be able to edit and re-submit it."
+                                            data-confirm-title="Revert Record to Draft"
+                                            data-confirm-type="warning"
+                                            data-confirm-btn="Yes, Revert to Draft">
                                             <i class="fas fa-unlock"></i>
                                         </asp:LinkButton>
                                     </asp:PlaceHolder>
                                     <asp:PlaceHolder ID="phAdminSubmit" runat="server" Visible='<%# UserSession.IsAdmin && Eval("STATUS").ToString() == "Draft" %>'>
-                                        <asp:LinkButton ID="btnAdminSubmit" runat="server" CommandName="AdminSubmit" CommandArgument='<%# Eval("EDU_ID") %>' CssClass="btn btn-sm btn-outline-success mr-1" ToolTip="Admin: Mark as Submitted and lock" OnClientClick="return confirm('Admin: Lock this record as Submitted?');">
+                                        <asp:LinkButton ID="btnAdminSubmit" runat="server" CommandName="AdminSubmit" CommandArgument='<%# Eval("EDU_ID") %>' CssClass="btn btn-sm btn-outline-success mr-1" ToolTip="Admin: Mark as Submitted and lock"
+                                            data-confirm="Lock this record as Submitted? The record will become an official locked entry."
+                                            data-confirm-title="Lock Record as Submitted"
+                                            data-confirm-type="success"
+                                            data-confirm-btn="Yes, Lock Record">
                                             <i class="fas fa-lock"></i>
                                         </asp:LinkButton>
                                     </asp:PlaceHolder>
@@ -347,21 +376,14 @@
             </div>
         </div>
         <div class="card-footer bg-light d-flex flex-wrap justify-content-between align-items-center py-3" style="padding-left: 1.25rem !important; padding-right: 1.25rem !important;">
-            <div class="small text-muted mb-2 mb-md-0">
+            <div class="small text-muted mb-0">
                 <i class="fas fa-info-circle mr-1 text-primary"></i> Note: Mark exactly one entry as <strong>Highest Qualification</strong> representing your highest degree.
             </div>
-            <asp:PlaceHolder ID="phBottomSubmitBtn" runat="server" Visible="false">
-                <div class="text-right">
-                    <asp:Button ID="btnBottomFinalSubmit" runat="server" Text="Submit Education Details" CssClass="btn btn-edu-success font-weight-bold shadow-sm btn-submit-with-caution" OnClick="btnFinalSubmit_Click" />
-                    <div class="small text-danger font-weight-bold mt-1">
-                        <i class="fas fa-exclamation-triangle mr-1"></i> Caution: Once submitted, records cannot be edited
-                    </div>
-                </div>
-            </asp:PlaceHolder>
+            <div class="small text-muted">
+                <i class="fas fa-shield-alt text-success mr-1"></i> Official Submission Locks Profile
+            </div>
         </div>
     </div>
-    </div> <!-- Close col-xl-9 col-lg-8 -->
-    </div> <!-- Close row -->
 
     <!-- ADD / EDIT QUALIFICATION MODAL FORM -->
     <asp:Panel ID="pnlModal" runat="server" CssClass="custom-modal-backdrop" style="display: none;" tabindex="-1" role="dialog">
@@ -381,6 +403,7 @@
                         <asp:HiddenField ID="hfEditEduId" runat="server" Value="0" />
                         <asp:HiddenField ID="hfSelectedMainQual" runat="server" />
                         <asp:HiddenField ID="hfSelectedSubQual" runat="server" />
+                        <asp:HiddenField ID="hfSelectedSubQualName" runat="server" />
 
                         <!-- Client-side instant error banner (0 page reload, immediate focus) -->
                         <div id="modalClientErrorBanner" class="alert alert-danger py-2 small mb-3" style="display: none;">
@@ -519,8 +542,10 @@
                 </div>
             </div>
     </asp:Panel>
-        </ContentTemplate>
-    </asp:UpdatePanel>
+                </ContentTemplate>
+            </asp:UpdatePanel>
+        </div> <!-- Close col-xl-9 col-lg-8 -->
+    </div> <!-- Close row -->
 </asp:Content>
 
 <asp:Content ID="Content3" ContentPlaceHolderID="ScriptsContent" runat="server">
@@ -577,6 +602,7 @@
         if (typeof Sys !== 'undefined' && Sys.WebForms && Sys.WebForms.PageRequestManager) {
             Sys.WebForms.PageRequestManager.getInstance().add_endRequest(function () {
                 initEducationUI();
+                EduApp.initIntranetPhotos();
             });
         }
     </script>

@@ -59,16 +59,14 @@ namespace EducationApp
             {
                 if (DBHelper.IsInvalidSpecialization(s))
                 {
-                    return string.Format("<span class='text-danger font-weight-bold' title='Placeholder or empty Specialization ({0}). Please click Edit to enter a valid value.'><i class='fas fa-exclamation-circle mr-1'></i>{1}</span>", 
-                        Server.HtmlEncode(s), string.IsNullOrEmpty(s) ? "(Needs Subject/NA)" : Server.HtmlEncode(s) + " (Enter valid)");
+                    return "<span class='text-muted' style='color:#94a3b8; font-weight:500;'>&mdash;</span>";
                 }
                 return Server.HtmlEncode(s);
             }
 
             if (DBHelper.IsPlaceholderOrInvalid(s))
             {
-                return string.Format("<span class='text-danger font-weight-bold' title='Placeholder or unselected value ({0}). Please click Edit to select a valid option.'><i class='fas fa-exclamation-circle mr-1'></i>{1}</span>", 
-                    Server.HtmlEncode(s), s == "" ? "(Needs Selection)" : Server.HtmlEncode(s) + " (Select valid)");
+                return "<span class='text-muted' style='color:#94a3b8; font-weight:500;'>&mdash;</span>";
             }
             return Server.HtmlEncode(s);
         }
@@ -78,8 +76,7 @@ namespace EducationApp
             string s = scoreVal != null ? scoreVal.ToString().Trim() : "";
             if (DBHelper.IsPlaceholderOrInvalid(s))
             {
-                return string.Format("<span class='text-danger font-weight-bold' title='Missing or placeholder score ({0}). Please click Edit to enter your valid Percentage or CGPA.'><i class='fas fa-exclamation-circle mr-1'></i>{1}</span>", 
-                    Server.HtmlEncode(s), string.IsNullOrEmpty(s) ? "(Needs Score)" : Server.HtmlEncode(s) + " (Enter valid)");
+                return "<span class='text-muted' style='color:#94a3b8; font-weight:500;'>&mdash;</span>";
             }
 
             // If already formatted with % or CGPA or Marks
@@ -111,7 +108,7 @@ namespace EducationApp
             if (yearVal != null) int.TryParse(yearVal.ToString(), out yr);
             if (yr < 1950 || yr > DateTime.Now.Year)
             {
-                return "<span class='text-danger font-weight-bold' title='Missing or invalid passing year. Please click Edit to select proper year.'><i class='fas fa-exclamation-circle mr-1'></i>" + (yr > 0 ? yr.ToString() : "Missing") + "</span>";
+                return "<span class='text-muted' style='color:#94a3b8; font-weight:500;'>&mdash;</span>";
             }
             return "<span class='font-weight-bold text-dark'>" + yr.ToString() + "</span>";
         }
@@ -128,7 +125,7 @@ namespace EducationApp
             if (isIncomplete)
             {
                 return "<span class='badge-status badge-draft'><i class='fas fa-pencil-alt mr-1'></i> Draft</span>" +
-                       "<div class='mt-1'><span class='badge badge-danger text-white px-2 py-0.5 badge-record-incomplete' style='font-size:0.7rem; font-weight:700;' title='Contains placeholder values (*). Must be edited before submitting.'><i class='fas fa-exclamation-triangle mr-1'></i>Action Required</span></div>";
+                       "<div class='mt-1'><span class='badge-pending-review badge-record-incomplete' title='Imported from legacy records. Click Edit to verify and complete details.'><i class='fas fa-pen mr-1'></i> Details Pending</span></div>";
             }
             return "<span class='badge-status badge-draft'><i class='fas fa-pencil-alt mr-1'></i> Draft</span>";
         }
@@ -155,23 +152,33 @@ namespace EducationApp
             litEmpPCNO.Text = pcno;
 
             DataRow profile = DBHelper.GetEmployeeProfile(pcno);
+            string empName = pcno;
+            string desig = "---";
+            string div = "---";
+
             if (profile != null)
             {
-                litEmpName.Text = profile["NAME"] != DBNull.Value ? profile["NAME"].ToString() : pcno;
-                litEmpDesignation.Text = profile["DESIGNATION"] != DBNull.Value ? profile["DESIGNATION"].ToString() : "---";
-                litEmpDivision.Text = profile["DIVNAME"] != DBNull.Value ? profile["DIVNAME"].ToString() : "---";
+                empName = profile["NAME"] != DBNull.Value ? profile["NAME"].ToString() : pcno;
+                desig = profile["DESIGNATION"] != DBNull.Value ? profile["DESIGNATION"].ToString() : "---";
+                div = profile["DIVNAME"] != DBNull.Value ? profile["DIVNAME"].ToString() : "---";
             }
             else
             {
-                litEmpName.Text = UserSession.CurrentUserName;
-                litEmpDesignation.Text = UserSession.Designation;
-                litEmpDivision.Text = UserSession.Division;
+                empName = UserSession.CurrentUserName;
+                desig = UserSession.Designation;
+                div = UserSession.Division;
             }
+
+            litEmpName.Text = empName;
+            litEmpDesignation.Text = desig;
+            litEmpDivision.Text = div;
 
             if (imgEmpPhoto != null)
             {
-                imgEmpPhoto.ImageUrl = "Static/Images/default_avatar.png";
-                imgEmpPhoto.Attributes["onerror"] = "this.onerror=null; this.src='Static/Images/default_avatar.png';";
+                string defaultAvatarUrl = ResolveUrl("~/Static/Images/default_avatar.png");
+                imgEmpPhoto.ImageUrl = defaultAvatarUrl;
+                imgEmpPhoto.Attributes["data-default-avatar"] = defaultAvatarUrl;
+                imgEmpPhoto.Attributes["onerror"] = "if (this.src !== this.getAttribute('data-default-avatar')) { this.src = this.getAttribute('data-default-avatar'); }";
 
                 bool enableIntranetPhotos = string.Equals(System.Configuration.ConfigurationManager.AppSettings["EnableIntranetPhotos"], "true", StringComparison.OrdinalIgnoreCase);
                 if (enableIntranetPhotos && !string.IsNullOrEmpty(pcno) && pcno != "---")
@@ -225,6 +232,7 @@ namespace EducationApp
             // Sidebar stats
             int qualCount = (dt != null) ? dt.Rows.Count : 0;
             litStatQualCount.Text = qualCount.ToString();
+            if (litCardQualCount != null) litCardQualCount.Text = qualCount.ToString();
 
             string highestName = "None";
             HighestQualTitle = "None";
@@ -249,8 +257,8 @@ namespace EducationApp
             {
                 if (hasIncompleteDrafts)
                 {
-                    litSubmissionStatusPill.Text = string.Format("<div class='emp-status-badge status-draft' style='background:#fef2f2; border:1px solid #fecaca; color:#b91c1c;'><i class='fas fa-exclamation-triangle mr-1'></i> {0} Draft ({1} Incomplete)</div>", draftCount, draftValidationErrors.Count);
-                    phDraftNotice.Visible = true;
+                    litSubmissionStatusPill.Text = string.Format("<div class='emp-status-badge status-draft' style='background:#fffbeb; border:1px solid #fde68a; color:#92400e;'><i class='fas fa-pencil-alt mr-1'></i> {0} Draft ({1} Pending Review)</div>", draftCount, draftValidationErrors.Count);
+                    phDraftNotice.Visible = false;
                     phDraftIncompleteNotice.Visible = true;
                     litDraftIncompleteCount.Text = draftValidationErrors.Count.ToString();
                     litDraftIncompleteDetails.Text = string.Join("", draftValidationErrors.ConvertAll(err => "<li class='mb-1'>" + err + "</li>"));
@@ -360,7 +368,7 @@ namespace EducationApp
                 }
             }
 
-            if (item != null)
+            if (item != null && !item.Value.Equals("OTHER", StringComparison.OrdinalIgnoreCase))
             {
                 ddlCollege.SelectedValue = item.Value;
                 pnlCustomCollege.Style["display"] = "none";
@@ -368,10 +376,14 @@ namespace EducationApp
             }
             else
             {
-                ddlCollege.Items.Insert(1, new ListItem(college, college));
-                ddlCollege.SelectedValue = college;
-                pnlCustomCollege.Style["display"] = "none";
-                txtCustomCollege.Text = college;
+                // College is not in the recognized master list:
+                // Select "OTHER" in dropdown and show the custom input field with the user's college name pre-filled
+                if (ddlCollege.Items.FindByValue("OTHER") != null)
+                {
+                    ddlCollege.SelectedValue = "OTHER";
+                }
+                pnlCustomCollege.Style["display"] = "block";
+                txtCustomCollege.Text = college.Equals("OTHER", StringComparison.OrdinalIgnoreCase) ? "" : college;
             }
         }
 
@@ -477,195 +489,221 @@ namespace EducationApp
             pnlFormError.Visible = false;
         }
 
+        public void OpenRecordForEdit(int eduId)
+        {
+            DataRow r = DBHelper.GetEducationRecordById(eduId);
+            if (r != null)
+            {
+                string recStatus = r["STATUS"] != DBNull.Value ? r["STATUS"].ToString() : "";
+                if (!UserSession.IsAdmin && recStatus.Equals("Submitted", StringComparison.OrdinalIgnoreCase))
+                {
+                    ShowAlert("Submitted qualification records are locked as official entries and cannot be edited.", "warning");
+                    return;
+                }
+
+                hfEditEduId.Value = eduId.ToString();
+                litModalTitle.Text = "Edit Qualification Record";
+
+                string mainCode = r["QUAL_MAIN_CODE"].ToString();
+                hfSelectedMainQual.Value = mainCode;
+                if (ddlMainQual.Items.FindByValue(mainCode) != null)
+                {
+                    ddlMainQual.SelectedValue = mainCode;
+                }
+                PopulateSubQualDropdown(mainCode);
+
+                string subCode = r["QUAL_SUB_CODE"].ToString();
+                string subName = r["QUAL_SUB_NAME"] != DBNull.Value ? r["QUAL_SUB_NAME"].ToString().Trim() : "";
+
+                // Normalize 10th standard records that had legacy codes ('GEN', 'NA') or incorrect veterinary label
+                if ((mainCode == "MTRI" || mainCode == "10TH") && (subCode == "GEN" || subCode == "NA" || subName.IndexOf("Animal Genetic", StringComparison.OrdinalIgnoreCase) >= 0))
+                {
+                    subCode = "GENERAL";
+                    subName = "General (All Subjects)";
+                }
+                else if (mainCode == "BMTRI" && (subCode == "GEN" || subCode == "NA" || subName.IndexOf("Animal Genetic", StringComparison.OrdinalIgnoreCase) >= 0))
+                {
+                    subCode = "GENERAL";
+                    subName = "General (Below 10th)";
+                }
+
+                hfSelectedSubQual.Value = subCode;
+                hfSelectedSubQualName.Value = subName;
+                if (ddlSubQual.Items.FindByValue(subCode) != null)
+                {
+                    ddlSubQual.SelectedValue = subCode;
+                }
+                else
+                {
+                    ddlSubQual.Items.Add(new ListItem(!string.IsNullOrEmpty(subName) ? subName : subCode, subCode));
+                    ddlSubQual.SelectedValue = subCode;
+                }
+
+                string yr = r["YEAR_PASSED"].ToString();
+                if (!DBHelper.IsPlaceholderOrInvalid(yr) && ddlYearPassed.Items.FindByValue(yr) != null)
+                {
+                    ddlYearPassed.SelectedValue = yr;
+                }
+                else
+                {
+                    ddlYearPassed.SelectedIndex = 0;
+                }
+
+                string specVal = r["SPECIALIZATION"] != DBNull.Value ? r["SPECIALIZATION"].ToString() : "";
+                txtSpecialization.Text = DBHelper.IsInvalidSpecialization(specVal) ? "" : specVal;
+                
+                string inst = r["INSTITUTE_NAME"] != DBNull.Value ? r["INSTITUTE_NAME"].ToString().Trim() : "";
+
+                // Canonical resolution for legacy abbreviations and outdated spellings
+                if (inst.Equals("VTU", StringComparison.OrdinalIgnoreCase) ||
+                    inst.IndexOf("Visweswaraiah", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    inst.IndexOf("Visvesvaraya Technological", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    inst = "Visvesvaraya Technological University (VTU), Belagavi";
+                }
+                else if (inst.Equals("IISC", StringComparison.OrdinalIgnoreCase) || inst.Equals("IISC, BANGALORE", StringComparison.OrdinalIgnoreCase))
+                {
+                    inst = "Indian Institute of Science (IISc), Bangalore";
+                }
+                else if (inst.Equals("JNTU", StringComparison.OrdinalIgnoreCase))
+                {
+                    inst = "Jawaharlal Nehru Technological University (JNTU), Hyderabad";
+                }
+                else if (inst.Equals("IGNOU", StringComparison.OrdinalIgnoreCase) || inst.IndexOf("IGNOU, NEW DELHI", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    inst = "Indira Gandhi National Open University (IGNOU), New Delhi";
+                }
+                else if (inst.Equals("CBSE Board", StringComparison.OrdinalIgnoreCase) || inst.Equals("CBSE Board New Delhi", StringComparison.OrdinalIgnoreCase))
+                {
+                    inst = "Central Board of Secondary Education (CBSE), New Delhi";
+                }
+                else if (inst.Equals("ICSE Board", StringComparison.OrdinalIgnoreCase) || inst.Equals("ISCE BOARD", StringComparison.OrdinalIgnoreCase) || inst.Equals("ICSE / ISC Board", StringComparison.OrdinalIgnoreCase))
+                {
+                    inst = "Council for the Indian School Certificate Examinations (CISCE / ICSE / ISC)";
+                }
+                else if (inst.Equals("PUE", StringComparison.OrdinalIgnoreCase))
+                {
+                    inst = "Department of Pre-University Education (PUE), Karnataka";
+                }
+
+                if (!DBHelper.IsPlaceholderOrInvalid(inst))
+                {
+                    if (ddlUniversity.Items.FindByValue(inst) != null)
+                    {
+                        ddlUniversity.SelectedValue = inst;
+                    }
+                    else if (ddlUniversity.Items.Count > 0)
+                    {
+                        ddlUniversity.Items.Insert(1, new ListItem(inst, inst));
+                        ddlUniversity.SelectedValue = inst;
+                    }
+                }
+                else
+                {
+                    ddlUniversity.SelectedIndex = 0;
+                }
+
+                string college = r["COLLEGE_NAME"] != DBNull.Value ? r["COLLEGE_NAME"].ToString() : "";
+                BindCollegeSelection(college);
+                
+                string cgpaVal = r["CGPA_MARKS"] != DBNull.Value ? r["CGPA_MARKS"].ToString() : "";
+                if (DBHelper.IsPlaceholderOrInvalid(cgpaVal))
+                {
+                    txtCgpaMarks.Text = "";
+                    ddlScoreType.SelectedValue = "Percentage";
+                }
+                else
+                {
+                    string trimmed = cgpaVal.Trim();
+                    if (trimmed.Contains("%"))
+                    {
+                        ddlScoreType.SelectedValue = "Percentage";
+                        txtCgpaMarks.Text = trimmed;
+                    }
+                    else if (trimmed.ToUpper().Contains("CGPA"))
+                    {
+                        ddlScoreType.SelectedValue = "CGPA";
+                        txtCgpaMarks.Text = trimmed;
+                    }
+                    else if (trimmed.Contains("/"))
+                    {
+                        ddlScoreType.SelectedValue = "Marks";
+                        txtCgpaMarks.Text = trimmed;
+                    }
+                    else
+                    {
+                        double num;
+                        if (double.TryParse(trimmed, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out num))
+                        {
+                            if (num > 10.0 && num <= 100.0)
+                            {
+                                ddlScoreType.SelectedValue = "Percentage";
+                                txtCgpaMarks.Text = num.ToString("0.##") + "%";
+                            }
+                            else if (num <= 10.0)
+                            {
+                                ddlScoreType.SelectedValue = "CGPA";
+                                txtCgpaMarks.Text = num.ToString("0.##");
+                            }
+                            else
+                            {
+                                ddlScoreType.SelectedValue = "Marks";
+                                txtCgpaMarks.Text = trimmed;
+                            }
+                        }
+                        else
+                        {
+                            ddlScoreType.SelectedValue = "Percentage";
+                            txtCgpaMarks.Text = trimmed;
+                        }
+                    }
+                }
+                
+                string grade = r["GRADE_DIVISION"] != DBNull.Value ? r["GRADE_DIVISION"].ToString() : "";
+                if (!DBHelper.IsPlaceholderOrInvalid(grade) && ddlGrade.Items.FindByValue(grade) != null)
+                {
+                    ddlGrade.SelectedValue = grade;
+                }
+                else
+                {
+                    ddlGrade.SelectedIndex = 0;
+                }
+
+                chkIsHighest.Checked = (Convert.ToInt32(r["IS_HIGHEST"]) == 1);
+                string rem = r["REMARKS"] != DBNull.Value ? r["REMARKS"].ToString() : "";
+                if (!string.IsNullOrEmpty(rem) && (rem.StartsWith("Migrated from", StringComparison.OrdinalIgnoreCase) || rem.StartsWith("Auto-synced", StringComparison.OrdinalIgnoreCase)))
+                {
+                    rem = "";
+                }
+                txtRemarks.Text = rem;
+
+                bool hasPlaceholders = DBHelper.IsPlaceholderOrInvalid(college) ||
+                                       DBHelper.IsPlaceholderOrInvalid(inst) ||
+                                       DBHelper.IsInvalidSpecialization(specVal) ||
+                                       DBHelper.IsPlaceholderOrInvalid(cgpaVal) ||
+                                       DBHelper.IsPlaceholderOrInvalid(grade) ||
+                                       DBHelper.IsPlaceholderOrInvalid(yr);
+
+                if (hasPlaceholders)
+                {
+                    pnlFormError.Visible = true;
+                    pnlFormError.CssClass = "alert alert-warning py-2 small mb-3";
+                    litFormError.Text = "<i class='fas fa-info-circle mr-1 text-warning'></i> <strong>Imported Record:</strong> Please verify and complete the details for this qualification before saving.";
+                }
+                else
+                {
+                    pnlFormError.Visible = false;
+                }
+                pnlModal.Style["display"] = "flex";
+            }
+        }
+
         protected void gvEducation_RowCommand(object sender, GridViewCommandEventArgs e)
         {
             if (e.CommandName == "EditRecord")
             {
                 int eduId = Convert.ToInt32(e.CommandArgument);
-                DataRow r = DBHelper.GetEducationRecordById(eduId);
-                if (r != null)
-                {
-                    string recStatus = r["STATUS"] != DBNull.Value ? r["STATUS"].ToString() : "";
-                    if (!UserSession.IsAdmin && recStatus.Equals("Submitted", StringComparison.OrdinalIgnoreCase))
-                    {
-                        ShowAlert("Submitted qualification records are locked as official entries and cannot be edited.", "warning");
-                        return;
-                    }
-
-                    hfEditEduId.Value = eduId.ToString();
-                    litModalTitle.Text = "Edit Qualification Record";
-
-                    string mainCode = r["QUAL_MAIN_CODE"].ToString();
-                    hfSelectedMainQual.Value = mainCode;
-                    if (ddlMainQual.Items.FindByValue(mainCode) != null)
-                    {
-                        ddlMainQual.SelectedValue = mainCode;
-                    }
-                    PopulateSubQualDropdown(mainCode);
-
-                    string subCode = r["QUAL_SUB_CODE"].ToString();
-                    hfSelectedSubQual.Value = subCode;
-                    if (ddlSubQual.Items.FindByValue(subCode) != null)
-                    {
-                        ddlSubQual.SelectedValue = subCode;
-                    }
-                    else
-                    {
-                        ddlSubQual.Items.Add(new ListItem(subCode, subCode));
-                        ddlSubQual.SelectedValue = subCode;
-                    }
-
-                    string yr = r["YEAR_PASSED"].ToString();
-                    if (!DBHelper.IsPlaceholderOrInvalid(yr) && ddlYearPassed.Items.FindByValue(yr) != null)
-                    {
-                        ddlYearPassed.SelectedValue = yr;
-                    }
-                    else
-                    {
-                        ddlYearPassed.SelectedIndex = 0;
-                    }
-
-                    string specVal = r["SPECIALIZATION"] != DBNull.Value ? r["SPECIALIZATION"].ToString() : "";
-                    txtSpecialization.Text = DBHelper.IsInvalidSpecialization(specVal) ? "" : specVal;
-                    
-                    string inst = r["INSTITUTE_NAME"] != DBNull.Value ? r["INSTITUTE_NAME"].ToString().Trim() : "";
-
-                    // Canonical resolution for legacy abbreviations and outdated spellings
-                    if (inst.Equals("VTU", StringComparison.OrdinalIgnoreCase) ||
-                        inst.IndexOf("Visweswaraiah", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                        inst.IndexOf("Visvesvaraya Technological", StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        inst = "Visvesvaraya Technological University (VTU), Belagavi";
-                    }
-                    else if (inst.Equals("IISC", StringComparison.OrdinalIgnoreCase) || inst.Equals("IISC, BANGALORE", StringComparison.OrdinalIgnoreCase))
-                    {
-                        inst = "Indian Institute of Science (IISc), Bangalore";
-                    }
-                    else if (inst.Equals("JNTU", StringComparison.OrdinalIgnoreCase))
-                    {
-                        inst = "Jawaharlal Nehru Technological University (JNTU), Hyderabad";
-                    }
-                    else if (inst.Equals("IGNOU", StringComparison.OrdinalIgnoreCase) || inst.IndexOf("IGNOU, NEW DELHI", StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        inst = "Indira Gandhi National Open University (IGNOU), New Delhi";
-                    }
-                    else if (inst.Equals("CBSE Board", StringComparison.OrdinalIgnoreCase) || inst.Equals("CBSE Board New Delhi", StringComparison.OrdinalIgnoreCase))
-                    {
-                        inst = "Central Board of Secondary Education (CBSE), New Delhi";
-                    }
-                    else if (inst.Equals("ICSE Board", StringComparison.OrdinalIgnoreCase) || inst.Equals("ISCE BOARD", StringComparison.OrdinalIgnoreCase) || inst.Equals("ICSE / ISC Board", StringComparison.OrdinalIgnoreCase))
-                    {
-                        inst = "Council for the Indian School Certificate Examinations (CISCE / ICSE / ISC)";
-                    }
-                    else if (inst.Equals("PUE", StringComparison.OrdinalIgnoreCase))
-                    {
-                        inst = "Department of Pre-University Education (PUE), Karnataka";
-                    }
-
-                    if (!DBHelper.IsPlaceholderOrInvalid(inst))
-                    {
-                        if (ddlUniversity.Items.FindByValue(inst) != null)
-                        {
-                            ddlUniversity.SelectedValue = inst;
-                        }
-                        else if (ddlUniversity.Items.Count > 0)
-                        {
-                            ddlUniversity.Items.Insert(1, new ListItem(inst, inst));
-                            ddlUniversity.SelectedValue = inst;
-                        }
-                    }
-                    else
-                    {
-                        ddlUniversity.SelectedIndex = 0;
-                    }
-
-                    string college = r["COLLEGE_NAME"] != DBNull.Value ? r["COLLEGE_NAME"].ToString() : "";
-                    BindCollegeSelection(college);
-                    
-                    string cgpaVal = r["CGPA_MARKS"] != DBNull.Value ? r["CGPA_MARKS"].ToString() : "";
-                    if (DBHelper.IsPlaceholderOrInvalid(cgpaVal))
-                    {
-                        txtCgpaMarks.Text = "";
-                        ddlScoreType.SelectedValue = "Percentage";
-                    }
-                    else
-                    {
-                        string trimmed = cgpaVal.Trim();
-                        if (trimmed.Contains("%"))
-                        {
-                            ddlScoreType.SelectedValue = "Percentage";
-                            txtCgpaMarks.Text = trimmed;
-                        }
-                        else if (trimmed.ToUpper().Contains("CGPA"))
-                        {
-                            ddlScoreType.SelectedValue = "CGPA";
-                            txtCgpaMarks.Text = trimmed;
-                        }
-                        else if (trimmed.Contains("/"))
-                        {
-                            ddlScoreType.SelectedValue = "Marks";
-                            txtCgpaMarks.Text = trimmed;
-                        }
-                        else
-                        {
-                            double num;
-                            if (double.TryParse(trimmed, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out num))
-                            {
-                                if (num > 10.0 && num <= 100.0)
-                                {
-                                    ddlScoreType.SelectedValue = "Percentage";
-                                    txtCgpaMarks.Text = num.ToString("0.##") + "%";
-                                }
-                                else if (num <= 10.0)
-                                {
-                                    ddlScoreType.SelectedValue = "CGPA";
-                                    txtCgpaMarks.Text = num.ToString("0.##");
-                                }
-                                else
-                                {
-                                    ddlScoreType.SelectedValue = "Marks";
-                                    txtCgpaMarks.Text = trimmed;
-                                }
-                            }
-                            else
-                            {
-                                ddlScoreType.SelectedValue = "Percentage";
-                                txtCgpaMarks.Text = trimmed;
-                            }
-                        }
-                    }
-                    
-                    string grade = r["GRADE_DIVISION"] != DBNull.Value ? r["GRADE_DIVISION"].ToString() : "";
-                    if (!DBHelper.IsPlaceholderOrInvalid(grade) && ddlGrade.Items.FindByValue(grade) != null)
-                    {
-                        ddlGrade.SelectedValue = grade;
-                    }
-                    else
-                    {
-                        ddlGrade.SelectedIndex = 0;
-                    }
-
-                    chkIsHighest.Checked = (Convert.ToInt32(r["IS_HIGHEST"]) == 1);
-                    txtRemarks.Text = r["REMARKS"] != DBNull.Value ? r["REMARKS"].ToString() : "";
-
-                    bool hasPlaceholders = DBHelper.IsPlaceholderOrInvalid(college) ||
-                                           DBHelper.IsPlaceholderOrInvalid(inst) ||
-                                           DBHelper.IsInvalidSpecialization(specVal) ||
-                                           DBHelper.IsPlaceholderOrInvalid(cgpaVal) ||
-                                           DBHelper.IsPlaceholderOrInvalid(grade) ||
-                                           DBHelper.IsPlaceholderOrInvalid(yr);
-
-                    if (hasPlaceholders)
-                    {
-                        pnlFormError.Visible = true;
-                        litFormError.Text = "<i class='fas fa-exclamation-triangle mr-1'></i> <strong>Incomplete Legacy Data:</strong> This record was imported with placeholder values (such as '*'). Please select your proper qualification, college/school, university, passing year, and grade before submitting.";
-                    }
-                    else
-                    {
-                        pnlFormError.Visible = false;
-                    }
-                    pnlModal.Style["display"] = "flex";
-                }
+                OpenRecordForEdit(eduId);
             }
             else if (e.CommandName == "DeleteRecord")
             {
@@ -748,13 +786,19 @@ namespace EducationApp
                 subCode = hfSelectedSubQual.Value;
             }
 
+            // Normalize Matriculation / 10th sub-qualifications
+            if ((mainCode == "MTRI" || mainCode == "10TH" || mainCode == "BMTRI") && (subCode == "NA" || subCode == "GEN"))
+            {
+                subCode = "GENERAL";
+            }
+
             // Validation of required fields
             if (string.IsNullOrEmpty(mainCode) || DBHelper.IsPlaceholderOrInvalid(mainCode))
             {
                 ShowFormError("Please select a valid Main Qualification from the list.");
                 return;
             }
-            if (string.IsNullOrEmpty(subCode) || DBHelper.IsPlaceholderOrInvalid(subCode))
+            if (string.IsNullOrEmpty(subCode) || (DBHelper.IsPlaceholderOrInvalid(subCode) && subCode != "GENERAL"))
             {
                 ShowFormError("Please select a valid Sub Qualification / Stream from the list.");
                 return;
@@ -824,8 +868,42 @@ namespace EducationApp
 
             string mainName = (ddlMainQual.SelectedItem != null && !string.IsNullOrEmpty(ddlMainQual.SelectedItem.Text)) 
                 ? ddlMainQual.SelectedItem.Text : mainCode;
-            string subName = (ddlSubQual.SelectedItem != null && !string.IsNullOrEmpty(ddlSubQual.SelectedItem.Text)) 
-                ? ddlSubQual.SelectedItem.Text : subCode;
+
+            // Resolve sub-qualification name from hidden field or scoped DB lookup to prevent cross-degree collision
+            string clientSubName = !string.IsNullOrEmpty(hfSelectedSubQualName.Value) ? hfSelectedSubQualName.Value.Trim() : null;
+            string dbSubName = DBHelper.GetSubQualificationName(mainCode, subCode);
+            string subName = !string.IsNullOrEmpty(clientSubName) 
+                ? clientSubName 
+                : (!string.IsNullOrEmpty(dbSubName) ? dbSubName : ((ddlSubQual.SelectedItem != null && !string.IsNullOrEmpty(ddlSubQual.SelectedItem.Text)) ? ddlSubQual.SelectedItem.Text : subCode));
+
+            // Safeguard against 'Animal Genetics and Breeding' overriding 10th Standard or non-veterinary degrees
+            if ((mainCode == "MTRI" || mainCode == "10TH" || mainCode == "BMTRI" || !mainCode.StartsWith("BV")) 
+                && subName.IndexOf("Animal Genetic", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                if (mainCode == "MTRI" || mainCode == "10TH")
+                {
+                    subCode = "GENERAL";
+                    subName = "General (All Subjects)";
+                }
+                else if (mainCode == "BMTRI")
+                {
+                    subCode = "GENERAL";
+                    subName = "General (Below 10th)";
+                }
+                else
+                {
+                    subName = !string.IsNullOrEmpty(dbSubName) ? dbSubName : "General";
+                }
+            }
+
+            if (subCode == "GENERAL" && (mainCode == "MTRI" || mainCode == "10TH"))
+            {
+                subName = "General (All Subjects)";
+            }
+            else if (subCode == "GENERAL" && mainCode == "BMTRI")
+            {
+                subName = "General (Below 10th)";
+            }
             int year = Convert.ToInt32(ddlYearPassed.SelectedValue);
             string spec = txtSpecialization.Text.Trim();
             string inst = ddlUniversity.SelectedValue;
@@ -903,6 +981,7 @@ namespace EducationApp
             ddlSubQual.SelectedIndex = 0;
             hfSelectedMainQual.Value = "";
             hfSelectedSubQual.Value = "";
+            hfSelectedSubQualName.Value = "";
             ddlYearPassed.SelectedIndex = 0;
             txtSpecialization.Text = "";
             ddlUniversity.SelectedIndex = 0;
