@@ -111,11 +111,6 @@
             </h3>
             <p class="text-muted small mb-0">Record, review, and maintain your official educational qualifications</p>
         </div>
-        <div class="mt-2 mt-md-0 d-flex align-items-center" style="gap: 8px;">
-            <span class="badge badge-light border text-muted px-3 py-2 font-weight-semibold shadow-xs" style="border-radius: 8px; font-size: 0.85rem;">
-                <i class="fas fa-shield-alt text-success mr-1"></i> Official Portal Record
-            </span>
-        </div>
     </div>
 
     <div class="row">
@@ -132,7 +127,6 @@
                     <div class="emp-side-avatar-frame">
                         <asp:Image ID="imgEmpPhoto" runat="server" AlternateText="Employee Photo" />
                     </div>
-                    <div class="emp-avatar-status-dot" title="Active Employee"></div>
                 </div>
 
                 <!-- Employee Details -->
@@ -203,6 +197,9 @@
                     <asp:AsyncPostBackTrigger ControlID="btnSidebarAdd" EventName="Click" />
                 </Triggers>
                 <ContentTemplate>
+            <!-- Tracking Hidden Field for Qualification Modal State -->
+            <asp:HiddenField ID="hfModalOpen" runat="server" Value="0" />
+
             <!-- Status Alerts / Guidance -->
             <asp:PlaceHolder ID="phSubmittedNotice" runat="server" Visible="false">
                 <div class="alert alert-success d-flex align-items-center mb-4 py-3 px-4 shadow-sm" style="border-radius: 12px; border-left: 5px solid #10b981; background: #ecfdf5;">
@@ -379,9 +376,6 @@
             <div class="small text-muted mb-0">
                 <i class="fas fa-info-circle mr-1 text-primary"></i> Note: Mark exactly one entry as <strong>Highest Qualification</strong> representing your highest degree.
             </div>
-            <div class="small text-muted">
-                <i class="fas fa-shield-alt text-success mr-1"></i> Official Submission Locks Profile
-            </div>
         </div>
     </div>
 
@@ -451,16 +445,25 @@
                         <div class="row">
                             <!-- University / Board -->
                             <div class="col-md-6 form-group">
-                                <label class="form-label-custom">University / Board / Recognized Institute <span class="req">*</span></label>
+                                <label class="form-label-custom" id="lblUniversity">University / Board / Recognized Institute <span class="req">*</span></label>
                                 <asp:DropDownList ID="ddlUniversity" runat="server" CssClass="form-control form-control-custom searchable-select">
                                 </asp:DropDownList>
+                                <small id="helpUniversityCert" class="form-text text-muted mt-1" style="display: none;">
+                                    <i class="fas fa-certificate mr-1 text-primary"></i> For certificates &amp; vocational courses, select the issuing authority (e.g. NCVT, DRDO/LRDE, C-DAC, State Tech Board) or 'Other Certifying Body'.
+                                </small>
                             </div>
 
                             <!-- College Name -->
                             <div class="col-md-6 form-group">
-                                <label class="form-label-custom">College / School Name <span class="req">*</span></label>
+                                <label class="form-label-custom" id="lblCollege">College / School Name <span class="req">*</span></label>
                                 <asp:DropDownList ID="ddlCollege" runat="server" CssClass="form-control form-control-custom searchable-select">
                                 </asp:DropDownList>
+                                <div class="custom-control custom-checkbox mt-1">
+                                    <input type="checkbox" class="custom-control-input" id="chkSameAsUniv" />
+                                    <label class="custom-control-label small text-muted font-weight-normal cursor-pointer" for="chkSameAsUniv" id="lblSameAsUniv">
+                                        <i class="fas fa-university mr-1 text-primary"></i> Studied directly at University Campus / Department (Same as University)
+                                    </label>
+                                </div>
                                 <asp:Panel ID="pnlCustomCollege" runat="server" CssClass="mt-2" style="display: none;">
                                     <label class="form-label-custom small text-muted mb-1"><i class="fas fa-pen mr-1"></i> Specify College / School Name: <span class="req">*</span></label>
                                     <asp:TextBox ID="txtCustomCollege" runat="server" CssClass="form-control form-control-custom" placeholder="e.g. Mangalore Institute of Technology and Engineering (MITE)"></asp:TextBox>
@@ -536,7 +539,7 @@
                                 <i class="fas fa-exclamation-circle text-warning mr-1"></i> Once submitted, cannot be edited
                             </span>
                             <asp:Button ID="btnSaveDraft" runat="server" Text="Save as Draft" CssClass="btn btn-secondary font-weight-bold px-3 shadow-sm btn-save-draft" OnClientClick="return EduApp.validateModalForm(false);" OnClick="btnSaveDraft_Click" ToolTip="Save this qualification as a draft to review, edit, or submit later" />
-                            <asp:Button ID="btnSaveAndSubmit" runat="server" Text="Save &amp; Submit" CssClass="btn btn-edu-success font-weight-bold px-4 shadow-sm btn-submit-with-caution" OnClick="btnSaveAndSubmit_Click" ToolTip="Save and officially submit this qualification record" />
+                            <asp:Button ID="btnSaveAndSubmit" runat="server" Text="Save &amp; Submit" CssClass="btn btn-edu-success font-weight-bold px-4 shadow-sm btn-submit-with-caution" OnClientClick="return EduApp.validateModalForm(true);" OnClick="btnSaveAndSubmit_Click" ToolTip="Save and officially submit this qualification record" />
                         </div>
                     </div>
                 </div>
@@ -572,12 +575,34 @@
                     }
                 }
 
+                function syncSameAsUnivCheckbox() {
+                    var val = $('#<%= ddlCollege.ClientID %>').val();
+                    var isSame = (val === 'University Campus / Department' || val === 'Direct Certification / Same as Issuing Authority');
+                    $('#chkSameAsUniv').prop('checked', isSame);
+                }
+
+                $('#chkSameAsUniv').off('change').on('change', function () {
+                    var isCert = EduApp.isCertificateQualification($('#<%= ddlMainQual.ClientID %>').val());
+                    var targetVal = isCert ? 'Direct Certification / Same as Issuing Authority' : 'University Campus / Department';
+                    if ($(this).is(':checked')) {
+                        $('#<%= ddlCollege.ClientID %>').val(targetVal).trigger('change');
+                    } else {
+                        var currVal = $('#<%= ddlCollege.ClientID %>').val();
+                        if (currVal === targetVal || currVal === 'University Campus / Department' || currVal === 'Direct Certification / Same as Issuing Authority') {
+                            $('#<%= ddlCollege.ClientID %>').val('').trigger('change');
+                        }
+                    }
+                });
+
                 $('#<%= ddlCollege.ClientID %>').off('change.custom').on('change.custom', function () {
                     checkCollegeCustomInput();
+                    syncSameAsUnivCheckbox();
                 });
 
                 // Initial check in case of existing selection
                 checkCollegeCustomInput();
+                syncSameAsUnivCheckbox();
+                EduApp.adaptFieldsForQualification($('#<%= ddlMainQual.ClientID %>').val());
 
                 // Dynamic placeholder for Score Type (Percentage / CGPA / Marks)
                 $('#<%= ddlScoreType.ClientID %>').off('change.score').on('change.score', function () {
@@ -603,6 +628,12 @@
             Sys.WebForms.PageRequestManager.getInstance().add_endRequest(function () {
                 initEducationUI();
                 EduApp.initIntranetPhotos();
+
+                // If modal tracking field indicates closed (0), ensure modal backdrop is strictly hidden
+                var modalState = $('input[id$="hfModalOpen"]').val();
+                if (modalState === '0') {
+                    $('[id$="pnlModal"]').css('display', 'none');
+                }
             });
         }
     </script>

@@ -71,24 +71,8 @@
                         </asp:PlaceHolder>
                     </ul>
 
-                    <!-- User Information & Logout -->
+                    <!-- Logout -->
                     <ul class="navbar-nav align-items-center">
-                        <li class="nav-item mr-3">
-                            <div class="user-nav-badge">
-                                <div class="user-avatar-circle overflow-hidden p-0" style="border: 1.5px solid rgba(255,255,255,0.4); background: #334155; width: 34px; height: 34px;">
-                                    <asp:Image ID="imgNavAvatar" runat="server" AlternateText="User" style="width: 100%; height: 100%; object-fit: cover;" />
-                                </div>
-                                <div style="line-height: 1.2;">
-                                    <div style="font-weight: 700; font-size: 0.88rem;">
-                                        <asp:Literal ID="litNavUserName" runat="server">Employee</asp:Literal>
-                                    </div>
-                                    <div style="font-size: 0.72rem; color: #94a3b8;">
-                                        PCNO: <asp:Literal ID="litNavPCNO" runat="server">---</asp:Literal>
-                                        <asp:Literal ID="litNavRoleBadge" runat="server"></asp:Literal>
-                                    </div>
-                                </div>
-                            </div>
-                        </li>
                         <li class="nav-item">
                             <a href="Logout.aspx" class="btn btn-sm btn-outline-danger font-weight-bold" style="border-radius: 20px; padding: 5px 14px;">
                                 <i class="fas fa-sign-out-alt mr-1"></i> Logout

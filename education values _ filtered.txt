@@ -1,0 +1,574 @@
+
+
+Id	Name	Group
+0	*	*
+1	B.Sc	B.Sc
+2	BE	BE
+3	ME	ME
+4	M.Sc	M.Sc
+5	AMIETE	BE
+6	B.Tech	BE
+7	M.Tech	ME
+8	AMIE	BE
+9	MCA	MCA
+10	MBA	MBA
+11	Ph.D	Ph.D
+12	M.Phil	M.Phil
+13	Diploma	DIP
+14	M.Li.Sc	M.Li.Sc
+15	B.Com	B.Com
+16	BA	BA
+17	MA	MA
+18	M.Com	M.Com
+19	SSLC/X Class	SSLC
+20	PUC/XII	PUC/XII
+21	B.Sc. (Engg.)	B.Sc. (Engg.)
+22	DMIT	DIP
+23	DIIT	*
+24	Post Diploma	Post Diploma Course
+25	DRE	DRE
+26	DEE	Diploma
+27	MIETE	ME
+28	M.Sc.(Engg)	M.Tech
+29	PGDIM	PGDIM
+30	DIM	Diploma in Management
+31	ADM	MANAGEMENT
+32	SDM	MANAGEMENT
+33	DLE (Hons)	Diploma
+34	Grad. IETE	*
+35	B.Ed.	*
+36	DTE	Diploma
+37	DME	Diploma
+38	A.D.I.M	Management
+39	D.H.R.M	Management
+40	BTE	BTE
+41	I.T.I	ITI
+42	NAC	NAC
+43	Stenography	Stenography
+44	NTC	NTC
+45	MBBS	Medicine
+46	B.Sc. PAR I	B.Sc.
+47	PG	*
+48	DCE	DCE
+49	B.Li.Sc	B.Li.Sc
+50	LLB	LAW
+51	ATC	ATC
+52	RVTI(w)	RVTI(w)
+53	HMT	HMT
+54	FITTER	ITI
+55	BBA	BBA
+56	'A' Level	DOEACC
+57	'O' Level	DOEACC
+58	PGDHRM	PGD
+59	BBM	BBM
+60	PGDMM	PGD
+61	ADST	Diploma
+62	BL	Law
+63	MSW	MSW
+64	HDMM	MANAGEMENT
+65	BCA	BCA
+66	NCVT	NCVT
+67	M S E E	Masters
+68	SSC	SSC
+69	AISSE	AISSE
+70	AISSCE	AISSCE
+71	D.E.C.E	DECE
+72	PGD (VLSI)	PGD
+73	THSLC	THSLC
+74	VHSC	VHSC
+75	PGDCS	PGDCS
+76	GRDUATION	GRDUATION
+77	PGDFM	PGDFM
+78	Dual Degree	BE
+79	PG Dip & IR	Diploma
+80	Below SSLC	Below SSLC
+81	MS	MS
+82	BLI Sc	BLI Sc
+83	MLI Sc	MLI Sc
+84	LLM	Law
+85	VHSE	VHSE
+86	PG DIIT	*
+87	GMP	*
+88	PGDPM	PGDPM
+89	DMM	DMM
+90	PGDMM	PGDMM
+91	DIT	DIT
+92	DIV	DIV
+93	PGDBA	PGDBA
+
+
+
+
+
+
+
+
+
+
+
+University/Institution
+0	*
+1	Anna University
+2	Bangalore University
+3	Andhra University
+4	IIT Kanpur
+5	IIT Madras
+6	IIT Delhi
+7	IISc, Bangalore
+8	U.P.T.U
+9	IIT, Guwahati
+10	IIT, Roorkee
+11	Benaras Hindu University
+12	BITS, Pilani
+13	IIT, Kharagpur
+14	REC, Warangal
+15	REC, Tiruchy
+16	REC, Suratkal
+17	REC, Calicut
+18	REC, Silacher
+19	MREC, Jaipur
+20	Karnataka University
+21	Mysore University
+22	Mangalore University
+23	Kuvempu University
+24	Annamalai University
+25	JNTU, Kakinada
+26	JNTU, Ananthpur
+27	Nagarjuna University
+28	Osmania University
+29	Sri Venkateswara University
+30	Central University, Hyderabad
+31	Bharathiar University
+32	Bharathidasan University
+33	Madras University
+34	Rajasthan University
+35	Kakatiya University
+36	Manonmani Sundaranathan University
+37	Sastra University
+38	Cochin University of Science & Technology, Cochin
+39	Vikram University, Ujjain
+40	REC, Bhopal
+41	Jainarayan Vayas University, Jodhpur
+42	Gulbarga University, Gulbarga
+43	Madhurai Kamaraj University
+44	Jawaharlal Nehru University, Delhi
+45	Delhi University, Delhi
+46	Pondicherry University
+47	U BTE Roorkee
+48	Kerala University
+49	REC, Hamirpur
+50	Mahatma Gandhi University, Kerala
+51	REC,Surat
+52	Gurunanak Dev University, Punjab
+53	Madurai University
+54	RD University
+55	Rajiv Gandhi Proudyogiki Vishwavidyalaya, Bhopal
+56	IIT Bombay
+57	BIT Mesra Ranchi
+58	IAT,Pune
+59	JNU,Delhi
+60	Avadh University
+61	Utkal University
+62	Mahatma Gandhi University,Kerala
+63	Geherwal University
+64	Allahabad University
+65	University of Calicut
+66	IETE, New Delhi
+67	Institution of Engineers, New Delhi
+68	M.N.N.I.T., Allahabad
+69	MNB Garwal University
+70	MERRUT University
+71	POONA University
+72	University of Calicut
+73	Calcutta University
+74	DDU Gorakhpur University
+75	KREC Surathkal
+76	Dr.H.S.Gaur University, Sagar
+77	Barkatulla University, Bhopal
+78	Lucknow University
+79	Kumoan University, Nainital
+80	BITS Ranchi
+81	Bundel Khand University
+82	Dayalbagh University
+83	REC, Bhalki
+84	Aligarh Muslim University, Aligarh
+85	Ranchi University
+86	REC, Rourkela
+87	Sambalpur University, Orissa
+88	AIMA,New Delhi
+89	IGNOU, NEW DELHI
+90	MIT,Madras
+91	Gorakhpur University
+92	Jabalpur University
+93	Banaras Hindu University
+94	Burdwan University
+95	REC,Durgapur
+96	MJP Rohilkhand, Bareley
+97	Maharshi Dayanand University, Rohtak
+98	Gujarat University
+99	B.S.B.A University, Muz,Bihar
+100	Rohilkhand University
+101	South Gujarat University
+102	REC,Jalandhar
+103	Jamia Millia Central University Delhi
+104	Amaravati University
+105	Marthwada University
+106	Centre for Electronics Design Technology
+107	MANIPUR UNIVERSITY
+108	Army University
+109	Punjab University
+110	IAI
+111	Bhopal University
+112	Punjab Technical University
+113	Dr.Ambedkar University
+114	REC,Allahabad
+115	M.B.T.I Kanpur
+116	I.E.T, C.S.J.M University Kanpur
+117	D.A.V.V, Indore
+118	Meghalaya Board of School Education
+119	North Eastern Hill University
+120	ISCE BOARD
+121	Assam University
+122	Institution of Engineers(India), Kolkatta
+123	Govind Ballabh Pant University of Agriculture & Technology
+124	University of Kerala
+125	PATNA UNIVERSITY
+126	DOEACC Centre
+127	NIIT Ltd.
+128	VIDYASAGAR UNIVERSITY
+129	Visweswaraiah Technological University, Belgaum
+130	University of Kalyani
+131	Bengal Engineering College, Shibpore
+132	Pt. RaviShankar University, Raipur
+133	MNIT,Jaipur
+134	Sri KrishnaDevaraya University
+135	Nagpur University
+136	Kannur University
+137	V B University, Hazaribagh
+138	SVNIT, Surat
+139	IIMM,Bangalore
+140	NIT,Jamshedpur
+141	NIT, Durgapur
+142	NIT, Hamirpur
+143	NIT, Silchar
+144	NIT, Warangal
+145	RGPV, Bhopal
+146	NIT, Kurukshetra
+147	Govind Ballab Pant Engg. College
+148	UPTUI, KNIT
+149	UP BTE, Lucknow
+150	West Bengal University
+151	ABV-IIITM, Gwalior
+152	BES University
+153	DIAT, Pune
+154	Kurukshetra University
+155	Calicut University
+156	NIT,Raipur
+157	NIT, Rourkela
+158	NIT, PATNA
+159	delhi university
+160	Dilasagram Convent high school, ballarpur
+161	Gurunanak College of Science, Ballarpur
+162	Govt. College of Engineering, Karad
+163	Indian Institute of Info. Tech, Allahabad
+164	U A Board
+165	UP Board Allahabad
+166	KSEEB
+167	PUE
+168	VTU
+169	General Education Department
+170	Higher Secondary Board
+171	BTER Jodhpur
+172	WBBSE
+173	WBCHSE
+174	WBSCTE
+175	JNTU
+176	Board of Secondary School Education
+177	Board of Intermediate Education
+178	IIT, Bangalore
+179	BIT, Durg
+180	MP Board
+181	SBTET
+182	AU
+183	IISC
+184	CSBE
+185	CUSAT
+186	nagarjuna University
+187	JNTU, Ananthapur, AP
+188	IIT Kharagpur
+189	State board of technical Education
+190	Kerala Board
+191	IISC
+192	osmania University
+193	NIT, Calicut
+194	ICSE/DPS, shimla
+195	CBSE/RED, Jhajjar
+196	K V Ponda (CBSE)
+197	Board of Public Exam. Kerala
+198	Board of Technical Education
+199	Z P High school
+200	Dept.of Tech.Edu, Kerala
+201	Board of Vocational HR SEC Edn
+202	University of Hyderabad
+203	UP Board
+204	BSEB, Bihar
+205	BIEE, Bihar
+206	V.B.U, Hazaribag
+207	PSG College of Technology, Coimbatore
+208	Anna University
+209	MAGADH UNIVERSITY BODH GAYA
+210	BIEC PATNA
+211	Veer Kunwar Singh University, ARA
+212	BSE, AP
+213	BIE, AP
+214	University of Bradford
+215	B.T.E UP
+216	Govt of A.P, Dept of Emp & Training
+217	Ministry of Labour & EMP
+218	Pre University Board
+219	WBSCTE, Kolkata
+220	Jiwaji University
+221	CBSE Board
+222	IIT, Rajasthan
+223	IIT, Gandhinagar
+224	VVB SS School
+225	CM science College,Darbhanga (BSEB)
+226	IIT, Patna
+227	ANU, Guntar
+228	Dept. Tech. Edu., Karnataka
+229	S.B.T.E Bihar
+230	B.S.E.H
+231	H.S.B.T.E
+232	UTTARAKHAND TECHNICAL UNIVERSITY
+233	NATIONAL COLLEGE BANGALORE
+234	ST. JOSEPHS COLLEGE BANGALORE
+235	SSC BOARD
+236	INTER BOARD
+237	NIT Trichy
+238	VINAYAKA MISSION UNIVERSITY SALEM
+239	CETE STQC,Hyderabad
+240	IDEMI MUMBAI
+241	Karnataka Board
+242	BSE, ODISHA
+243	HSCE, ODISHA
+244	SCTE & VT, ODISHA
+245	Sikkim Manipal University
+246	B.S.E.R, AJMER
+247	B.T.E.R, Jodhpur
+248	IGNOU
+249	AMITE
+250	Pune Board
+251	Mumbai Board
+252	P E C, Chandigarh
+253	RGUKT, Basar
+254	Nashik Board
+255	Automomous. Inst of Govt of Maharashtra
+256	Himachal Pradesh University Shimla Himachal Pradesh
+257	HP BOARD OF SCHOOL EDUCATION DHARAMSHAL HIMACHAL PRADESH
+258	ASSAM STATE BOARD
+259	UNIVERSITY OF MADRAS
+260	BANGALORE UNIVERSITY
+261	DREXEL UNIVERSITY, PA, USA
+262	BIHAR INTERMEDIATE EDUCATION COUNCIL, PATNA
+263	Biju Patnaik University of Technology, Orissa, Rourkela
+264	Jawaharlal Nehru Technological University, Hyderabad
+265	Karnataka State Open University
+266	Shivaji University, Kolhapur
+267	Bharati Vidypeetha University, Pune
+268	VHSE BOARD
+269	Board of Hariyana
+270	Oxford Evening Polytechnic, JP Nagar, Bengaluru
+271	University of Poona
+272	GPM College
+273	GRM Sr Sec School
+274	NCVT
+275	IIT, Jodhpur
+276	NIT, SURATHKAL
+277	Tripura
+278	IIM LUCKNOW
+279	AP Board
+280	Tamilnadu State Board
+281	CENTRAL UNIVERSITY OF RAJASTHAN
+282	University of Ajmer
+283	NIT, Agartala
+284	Dr APJ Abdul Kalam Technical University, UP
+285	CHSE, ODISHA
+286	CHSS, Jaipur
+287	JNVU, JODHPUR
+288	Pune University
+289	IIT, Indore
+290	NIT, Delhi
+291	MANIT, Bhopal
+292	GGV, Bilaspur
+293	UTTARAKHAND BOARD
+294	GRAPHIC ERA UNIVERSITY
+295	Maharastra State Board
+296	VIT, PUNE
+297	MSBSHSE, PUNE
+298	NIT, Srinagar
+299	Siddarth University
+300	RBSE, Ajmer
+301	Rajasthan board
+302	Banarthali University
+303	D.U
+304	SEBA, Assam
+305	SCTE, Assam
+306	NERIST, Nirjuli
+307	IIT, Hyderabad
+308	UPTU, Lucknow
+309	TRRRSVM MIC Kashipur
+310	NIT. Uttarakhand
+311	KV Bhaderwah
+312	BSF Sr Sec School
+313	AKTU
+314	MIT Muzaharpur
+315	YMCA University
+316	IIT, Roorkee
+317	SDM Sr Sec School
+318	Green Meadows
+319	G.B.P.U.A.T, Pantnagar
+320	KV (AFS), Bormer
+321	Dundlod Public School Jhunjhunu
+322	KVM Public Sr Sec School, Sikar
+323	Govt poly, Nasik
+324	CMM Jabalpur
+325	TMBU, Bhagalpur
+326	BVDU, Pune
+327	MIT-SDE, Pune
+328	GOVT.POLYTECHNIC BANKA
+329	DNS COLLEGE BHUSIARAJOUN
+330	H.S.SALEMPUR
+331	SBTE, Bihar
+332	JAC board
+333	SBTE Jharkhand
+334	SSIS,DERABASSI
+335	GMSSS,CHANDIGARH SEC-16
+336	GGDSD,PUNJAB UNIVERSITY
+337	SSK NAND INTERCOLL
+338	PMV POLYTECNIC MATHURA
+339	S.V GOVT POLYTECHNIC
+340	ICSE Board
+341	ISC
+342	UBTER
+343	SEBA
+344	AHSEC
+345	W.B.B.S.E
+346	W.B.C.H.S.E
+347	Maharashtra State Board
+348	Hemwanti Nandan Bahuguna Garhwal University
+349	MADAN MOHAN MALAVIYA UNIVERSITY OF TECHNOLOGY, GORAKHPUR, UP
+
+
+
+
+Id	Subject Name	Subject Group
+0	*	*
+1	Manufacturing Technology	Mechanical
+2	Microwave and Radar Electronics	Electronics
+3	Antennas	Electronics
+4	Structures	Civil Engg
+5	Information Technology	Computer Science
+6	Computer Science	Computer Science
+7	Electronics and Communications	Electronics
+8	Electrical and Electronics	Electrical
+9	Telecommunication Engineering	Telecommunication
+10	Mechanical Engineering	Mechanical
+11	Civil Engineering	Civil
+12	Physics	Physics
+13	Chemistry	Chemistry
+14	Mathematics	Mathematics
+15	Information Science	Computer Science
+16	Chemical Engineering	Chemical
+17	Computer Engineering	Computer Science
+18	Instrumentation Technology	Electronics
+19	Computer Applications	Computer Science
+20	Commerce	Commerce
+21	Arts	Arts
+22	Management	Management
+23	English	Languages
+24	Electronics	Electronics
+25	Engineering Design	Mechanical
+26	Communication Systems	Electronics
+27	Electronics and Instrumentation	Electronics
+28	Power Electronics	Electrical
+29	Electronics and Telecommunication	Electronics
+30	Radar Systems	Radar
+31	Electrical Engineering	Electrical
+32	Applied Physics	Physics
+33	Microwave Engineering	Electronics
+34	Modelling and Simulation	Physics
+35	Advanced Electronics	Electronics
+36	Computer Technology	Computer Science
+37	Heat Power	Heat Power
+38	Thermal Engineering	Mechanical
+39	Laser and ElectroOptics	Electronics
+40	Engineering Systems	Computer Science
+41	Signal Processing	Electronics
+42	Finance	Management
+43	Solid State Technology	Physics
+44	Spherical Vector Wave Function	*
+45	VLSI Design	Electronics
+46	Library Science	*
+47	Control and Instrumentation	Electrical
+48	Radar and Communcation	Radar
+49	Process Engineering	*
+50	Machine Design	Mechanical
+51	Software Systems	Computer Science
+52	System Science and Automation	Computer Science
+53	Aerospace Engineering	Aerospace
+54	Industrial Electronics	Electronics
+55	Communication Engineering	Electronics
+56	Electronic Design	Electronics
+57	Production Engineering	Mechanical
+58	Sound and TV	Electronics
+59	Automobile Engineering	Mechanical
+60	Computer Communication	Computer Science
+61	Optical Communication	Electronics
+62	Craftsman	Craftsman
+63	Electricals	Electrical
+64	Radio Mechanics	Electronics
+65	Public Relations	Administratiorn
+66	Buisiness Administration	Administration
+67	Business Management	Management
+68	Law	Law
+69	ElectroPlating	Chemical
+70	Power Systems	Electrical
+71	Reliability Engineering	Electronics
+72	Marketing	Management
+73	Digital Systems	Electronics
+74	OPTOELECTRONICS	OPTOELECTRONICS
+75	Hindi	Arts
+76	Digital Electronics and Advanced Communications	Electronics
+77	Computer and Information Science	Computer
+78	Microwave Signals & Systems	Electronics
+79	Material science	Mechanical
+80	Human Resource Management	HRM
+81	POLITICAL SCIENCE	GENERAL
+82	ECONOMICS	GENERAL
+83	RADIO & TRANSISTOR	ELECTRONICS
+84	Secratarial Practice	PA
+85	Printing Technology	Printing
+86	Communication Control & Networking	Computer Science
+87	Zoology	Biological Sciences
+88	Sociology	Arts
+89	High Voltage Engineering	Electronics
+90	Computer Science & Engineering	Computer Science
+91	DLLELW	Miscellaneous
+92	science	science
+93	General	general
+94	Maths	Maths
+95	Control System Engineering	Electrical
+96	RF & Microwave	Electronics and Electrical Communication Engineering
+97	INSTRUMENTATION AND CONTROL ENGINEERING	INSTRUMENTATION
+98	Radio Frequency Design and Technology	Electronics
+99	MS	MASTER OF SCIENCE
+100	MS	MS
+101	MICROELECTRONICS	MICROELECTRONICS
+102	PCMB	INTERMEDIATE
+103	MS	ENGINEERING
+104	M.S.	M.S.
+105	PCM	PCM
+106	MASTER OF SCINECE	MASTER OF SCIENCE
+107	Computer & Information Science	Computer Science
+108	MACHINIST	MECHANICAL
+109	INSTRUMENTATION ENGINEERING	INSTRUMENTATION

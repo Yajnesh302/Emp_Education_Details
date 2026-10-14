@@ -96,14 +96,21 @@
                 return { msg: "Please enter Specialization / Major Subject (or 'N/A' if not applicable). Placeholder values like '*' are not allowed.", $focus: $spec };
             }
 
+            var isCert = EduApp.isCertificateQualification($main.val());
             var univVal = $univ.val();
             if (!univVal || EduApp.isPlaceholder(univVal)) {
-                return { msg: "Please select a valid University / Board from the list. Placeholder values like '*' are not allowed.", $focus: $univ };
+                var fieldName = isCert ? "Certifying Body / Issuing Authority" : "University / Board";
+                return { msg: "Please select a valid " + fieldName + " from the list. Placeholder values like '*' are not allowed.", $focus: $univ };
             }
 
             var collVal = $coll.val();
             if (!collVal || EduApp.isPlaceholder(collVal)) {
-                return { msg: "Please select a valid College / School Name from the list.", $focus: $coll };
+                if (isCert) {
+                    collVal = 'Direct Certification / Same as Issuing Authority';
+                    $coll.val(collVal);
+                } else {
+                    return { msg: "Please select a valid College / School Name from the list.", $focus: $coll };
+                }
             }
             if (collVal === 'OTHER' || (collVal && collVal.indexOf('Other') === 0)) {
                 var customVal = $.trim($customColl.val());
@@ -173,6 +180,7 @@
 
             // Reset record ID and hidden fields
             $('[id$="hfEditEduId"]').val('0');
+            $('[id$="hfModalOpen"]').val('1');
             $('[id$="hfSelectedMainQual"]').val('');
             $('[id$="hfSelectedSubQual"]').val('');
             $('[id$="hfSelectedSubQualName"]').val('');
@@ -227,6 +235,7 @@
             $('[id$="chkIsHighest"]').prop('checked', false);
             $('[id$="txtRemarks"]').val('');
             EduApp.clearModalError();
+            EduApp.adaptFieldsForQualification('');
 
             // Display modal smoothly with flex positioning
             $modal.css('display', 'flex').hide().fadeIn(150);
@@ -252,6 +261,8 @@
                     $(this).css('display', 'none');
                 });
             }
+            $('input[id$="hfModalOpen"]').val('0');
+            $('input[id$="hfEditEduId"]').val('0');
             EduApp.clearModalError();
         },
 
@@ -678,8 +689,12 @@
                 'MS': ['MS', 'MBBS', 'MD'],
                 'BDS': ['BDS', 'MBBS'],
 
-                // ITI
-                'ITI': ['ITI', 'CC']
+                // Vocational / Apprenticeship / ITI / Certificate (LRDE Trades)
+                'ITI': ['ITI', 'NAC', 'NTC', 'NCVT', 'CC'],
+                'NAC': ['NAC', 'ITI', 'NTC', 'NCVT', 'CC'],
+                'NTC': ['NTC', 'NAC', 'ITI', 'NCVT', 'CC'],
+                'NCVT': ['NCVT', 'NAC', 'NTC', 'ITI', 'CC'],
+                'CC': ['CC', 'NAC', 'ITI', 'NTC', 'NCVT']
             };
 
             function filterSubOptions() {
@@ -775,6 +790,7 @@
                 $('input[id$="hfSelectedMainQual"]').val(mVal);
                 EduApp.clearModalError();
                 filterSubOptions();
+                EduApp.adaptFieldsForQualification(mVal);
             });
 
             $sub.off('change.cascade').on('change.cascade', function () {
@@ -798,6 +814,87 @@
             // If main qualification is already selected on load (e.g. edit mode), filter immediately
             if ($main.val()) {
                 filterSubOptions();
+                EduApp.adaptFieldsForQualification($main.val());
+            }
+        },
+
+        /**
+         * Determines if a qualification code or name represents a certificate, vocational, or apprenticeship qualification
+         */
+        isCertificateQualification: function (qualVal) {
+            if (!qualVal) return false;
+            var q = String(qualVal).trim().toUpperCase();
+            var certCodes = ['CC', 'NAC', 'NTC', 'NCVT', 'ITI', 'ATC', 'CERT', 'CERTIFICATE', 'VOCATIONAL', 'APPRENTICE', 'TRAINING'];
+            for (var i = 0; i < certCodes.length; i++) {
+                if (q === certCodes[i] || q.indexOf(certCodes[i] + ' -') === 0 || q.indexOf('- ' + certCodes[i]) !== -1 || q.indexOf(certCodes[i]) !== -1) {
+                    return true;
+                }
+            }
+            return false;
+        },
+
+        /**
+         * Dynamically adjusts form labels, help hints, and college defaults when a Certificate is selected
+         */
+        adaptFieldsForQualification: function (qualVal) {
+            var isCert = EduApp.isCertificateQualification(qualVal);
+
+            var $univLabel = $('#lblUniversity, #lblAdminUniversity, label[for*="ddlUniversity"]');
+            var $helpCert = $('#helpUniversityCert, #helpAdminUniversityCert');
+            var $sameCheckbox = $('#chkSameAsUniv, #chkAdminSameAsUniv');
+            var $sameLabel = $('#lblSameAsUniv, #lblAdminSameAsUniv');
+            var $collSelect = $('select[id$="ddlCollege"]');
+
+            if (isCert) {
+                // Adapt University field to Certifying Body / Issuing Authority
+                if ($univLabel.length) {
+                    $univLabel.html('<i class="fas fa-award text-primary mr-1"></i> Certifying Body / Issuing Authority / Institute <span class="req">*</span>');
+                }
+                if ($helpCert.length) {
+                    $helpCert.slideDown(150);
+                }
+
+                // Adapt College checkbox label
+                if ($sameLabel.length) {
+                    $sameLabel.html('<i class="fas fa-certificate mr-1 text-primary"></i> Direct Certification / Issued directly by Organization (No Separate College)');
+                }
+
+                // If college is empty, not selected, or set to university campus, auto-select Direct Certification
+                var currentColl = $collSelect.val();
+                var directVal = 'Direct Certification / Same as Issuing Authority';
+                if (!currentColl || currentColl === 'University Campus / Department' || currentColl === directVal) {
+                    if ($collSelect.find('option[value="' + directVal + '"]').length === 0) {
+                        $collSelect.append($('<option>', { value: directVal, text: directVal + ' (No Separate College)' }));
+                    }
+                    $collSelect.val(directVal);
+                    if ($collSelect.data('searchable-initialized')) {
+                        EduApp.updateTriggerText($collSelect);
+                    }
+                    $sameCheckbox.prop('checked', true);
+                    $('[id$="pnlCustomCollege"]').hide();
+                }
+            } else {
+                // Revert to standard University / Board labels
+                if ($univLabel.length) {
+                    $univLabel.html('University / Board / Recognized Institute <span class="req">*</span>');
+                }
+                if ($helpCert.length) {
+                    $helpCert.slideUp(150);
+                }
+
+                if ($sameLabel.length) {
+                    $sameLabel.html('<i class="fas fa-university mr-1 text-primary"></i> Studied directly at University Campus / Department (Same as University)');
+                }
+
+                // If currently set to Direct Certification, clear it
+                var currentColl = $collSelect.val();
+                if (currentColl === 'Direct Certification / Same as Issuing Authority') {
+                    $collSelect.val('');
+                    if ($collSelect.data('searchable-initialized')) {
+                        EduApp.updateTriggerText($collSelect);
+                    }
+                    $sameCheckbox.prop('checked', false);
+                }
             }
         },
 
@@ -1069,13 +1166,20 @@
             confirmBtnText: btnText,
             onConfirm: function () {
                 trigger.__confirmed = true;
-                if (typeof trigger.click === 'function') {
-                    trigger.click();
-                } else if ($(trigger).is('a')) {
+                if ($(trigger).is('a')) {
                     var href = $(trigger).attr('href');
                     if (href && href.indexOf('javascript:') === 0) {
-                        window.location.href = href;
+                        var jsCode = href.substring(11);
+                        try {
+                            new Function(jsCode)();
+                        } catch (err) {
+                            eval(jsCode);
+                        }
+                        return;
                     }
+                }
+                if (typeof trigger.click === 'function') {
+                    trigger.click();
                 }
             }
         });
@@ -1265,6 +1369,12 @@
                 prm.add_endRequest(function () {
                     EduApp.initAllSearchable();
                     EduApp.initIntranetPhotos();
+
+                    // If modal state is 0, ensure modal backdrop is strictly hidden
+                    var modalState = $('input[id$="hfModalOpen"]').val();
+                    if (modalState === '0') {
+                        $('[id$="pnlModal"]').css('display', 'none');
+                    }
                 });
                 prm._eduAppEndRequestBound = true;
             }

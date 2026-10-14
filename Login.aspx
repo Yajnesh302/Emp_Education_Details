@@ -242,9 +242,6 @@
                         <p class="brand-subtitle">
                             Official Internal Academic &amp; Qualification Record Management System
                         </p>
-                        <div class="badge-auth-security">
-                            <i class="fas fa-shield-alt mr-2"></i> Official Authentication Portal
-                        </div>
                     </div>
 
                     <!-- Right Form Column -->

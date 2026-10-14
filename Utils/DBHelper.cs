@@ -414,6 +414,16 @@ namespace EducationApp.Utils
 
                                 // Consolidate BMTRI (Below 10th)
                                 ExecuteSql(conn, "UPDATE EDU_QUAL_SUB SET SUB_CODE = 'GENERAL', SUB_NAME = 'General (Below 10th)' WHERE MAIN_QUAL_CODE = 'BMTRI' AND SUB_CODE = 'NA'");
+
+                                // Automatic deduplication of EDU_QUAL_SUB for identical (MAIN_QUAL_CODE, SUB_CODE) pairs
+                                ExecuteSql(conn, @"
+                                    DELETE FROM EDU_QUAL_SUB a
+                                    WHERE a.ROWID > (
+                                        SELECT MIN(b.ROWID)
+                                        FROM EDU_QUAL_SUB b
+                                        WHERE NVL(b.MAIN_QUAL_CODE, '__NULL__') = NVL(a.MAIN_QUAL_CODE, '__NULL__')
+                                          AND b.SUB_CODE = a.SUB_CODE
+                                    )");
                             }
 
                             if (TableExists(conn, "EDU_QUAL_MAPPING"))
@@ -433,9 +443,28 @@ namespace EducationApp.Utils
                                                    SET QUAL_SUB_CODE = 'GENERAL', QUAL_SUB_NAME = 'General (Below 10th)' 
                                                    WHERE QUAL_MAIN_CODE = 'BMTRI' 
                                                      AND (QUAL_SUB_CODE IN ('GEN', 'NA') OR QUAL_SUB_NAME LIKE '%Animal Genetics%')");
+
+                                // Auto-heal records where QUAL_SUB_NAME was populated with SPECIALIZATION instead of canonical SUB_NAME from EDU_QUAL_SUB
+                                ExecuteSql(conn, @"UPDATE EDU_EMP_EDUCATION e
+                                                   SET e.QUAL_SUB_NAME = (
+                                                       SELECT qs.SUB_NAME FROM EDU_QUAL_SUB qs
+                                                       WHERE qs.SUB_CODE = e.QUAL_SUB_CODE
+                                                         AND (qs.MAIN_QUAL_CODE = e.QUAL_MAIN_CODE OR qs.MAIN_QUAL_CODE IS NULL)
+                                                         AND ROWNUM = 1
+                                                   )
+                                                   WHERE e.QUAL_SUB_CODE IS NOT NULL
+                                                     AND EXISTS (
+                                                       SELECT 1 FROM EDU_QUAL_SUB qs
+                                                       WHERE qs.SUB_CODE = e.QUAL_SUB_CODE
+                                                         AND (qs.MAIN_QUAL_CODE = e.QUAL_MAIN_CODE OR qs.MAIN_QUAL_CODE IS NULL)
+                                                         AND qs.SUB_NAME <> e.QUAL_SUB_NAME
+                                                     )");
                             }
 
                             InvalidateSubQualificationsCache();
+
+                            // 16. Ensure NAC, NTC, CC, ITI and LRDE trades are fully populated
+                            EnsureVocationalAndApprenticeshipMasterData(conn);
                         }
                         catch { }
                     }
@@ -447,6 +476,160 @@ namespace EducationApp.Utils
                     System.Diagnostics.Debug.WriteLine("EnsureSchema Warning: " + ex.Message);
                     _schemaEnsured = true; // allow app to continue
                 }
+            }
+        }
+
+        private static void EnsureVocationalAndApprenticeshipMasterData(OracleConnection conn)
+        {
+            try
+            {
+                if (!TableExists(conn, "EDU_QUAL_MAIN") || !TableExists(conn, "EDU_QUAL_SUB")) return;
+
+                // 1. Ensure NAC, NTC, NCVT, CC, ITI are in EDU_QUAL_MAIN
+                ExecuteSql(conn, @"
+                    MERGE INTO EDU_QUAL_MAIN dest
+                    USING (
+                        SELECT 'NAC' AS C, 'NATIONAL APPRENTICESHIP CERTIFICATE' AS N, 'Vocational / Certificate' AS CAT FROM DUAL UNION ALL
+                        SELECT 'NTC' AS C, 'NATIONAL TRADE CERTIFICATE' AS N, 'Vocational / Certificate' AS CAT FROM DUAL UNION ALL
+                        SELECT 'NCVT' AS C, 'NATIONAL COUNCIL FOR VOCATIONAL TRAINING CERTIFICATE' AS N, 'Vocational / Certificate' AS CAT FROM DUAL UNION ALL
+                        SELECT 'CC' AS C, 'CERTIFICATE COURSE' AS N, 'Vocational / Certificate' AS CAT FROM DUAL UNION ALL
+                        SELECT 'ITI' AS C, 'INDUSTRIAL TRAINING INSTITUTE (ITI)' AS N, 'Vocational / Certificate' AS CAT FROM DUAL
+                    ) src ON (dest.QUAL_CODE = src.C)
+                    WHEN NOT MATCHED THEN INSERT (QUAL_CODE, QUAL_NAME, QUAL_CATEGORY, IS_ACTIVE) VALUES (src.C, src.N, src.CAT, 1)");
+
+                // 2. Ensure EDU_QUAL_MAPPING maps old QFN 42 to NAC and 44 to NTC
+                if (TableExists(conn, "EDU_QUAL_MAPPING"))
+                {
+                    ExecuteSql(conn, "UPDATE EDU_QUAL_MAPPING SET NEW_QUAL_MAIN_CODE = 'NAC', NEW_QUAL_SUB_CODE = 'APPR' WHERE OLD_QFN_ID = 42");
+                    ExecuteSql(conn, "UPDATE EDU_QUAL_MAPPING SET NEW_QUAL_MAIN_CODE = 'NTC', NEW_QUAL_SUB_CODE = 'VOCATIONAL' WHERE OLD_QFN_ID = 44");
+                    ExecuteSql(conn, "UPDATE EDU_QUAL_MAPPING SET NEW_QUAL_MAIN_CODE = 'CC', NEW_QUAL_SUB_CODE = 'STENO' WHERE OLD_QFN_ID = 43");
+                }
+
+                // 3. Update existing records in EDU_EMP_EDUCATION where QFN 42 / NAC was previously labeled as CC
+                if (TableExists(conn, "EDU_EMP_EDUCATION"))
+                {
+                    ExecuteSql(conn, @"
+                        UPDATE EDU_EMP_EDUCATION
+                        SET QUAL_MAIN_CODE = 'NAC',
+                            QUAL_MAIN_NAME = 'NATIONAL APPRENTICESHIP CERTIFICATE'
+                        WHERE QUAL_MAIN_CODE = 'CC'
+                          AND (
+                              UPPER(SPECIALIZATION) LIKE '%APPRENTICE%'
+                              OR UPPER(REMARKS) LIKE '%NAC%'
+                              OR UPPER(QUAL_SUB_NAME) LIKE '%APPRENTICE%'
+                          )");
+                }
+
+                // 4. Seed comprehensive LRDE-specific Sub Qualifications for NAC, ITI, CC, NTC, NCVT
+                string[] lrdeMains = new string[] { "NAC", "ITI", "CC", "NTC", "NCVT" };
+                Tuple<string, string>[] lrdeTrades = new Tuple<string, string>[]
+                {
+                    Tuple.Create("RADAR", "Radar Mechanic / Radar Systems Technician"),
+                    Tuple.Create("EL_MECH", "Electronics Mechanic"),
+                    Tuple.Create("RADIO_TV", "Radio and Television Mechanic"),
+                    Tuple.Create("RF_MW", "RF and Microwave Technician"),
+                    Tuple.Create("INSTR_MECH", "Instrument Mechanic / Electronic Instrumentation"),
+                    Tuple.Create("PCB_SMT", "PCB Fabrication, Design & SMT Assembly"),
+                    Tuple.Create("OPTO", "Optoelectronics & Fiber Optics Technician"),
+                    Tuple.Create("TELECOM", "Telecommunication & Network Systems"),
+                    Tuple.Create("CALIB", "Test, Calibration & Measurement Technician"),
+                    Tuple.Create("ELECT", "Electrician / Industrial Electrician"),
+                    Tuple.Create("WIRE", "Wireman & Military Cable Harnessing"),
+                    Tuple.Create("PWR_SYS", "Power Electronics & UPS Systems"),
+                    Tuple.Create("RAC", "Refrigeration & Air Conditioning (Chiller / Radar Cooling)"),
+                    Tuple.Create("FIT", "Fitter (Mechanical / Assembly / Bench Fitter)"),
+                    Tuple.Create("MEC", "Machinist / Precision Machinist"),
+                    Tuple.Create("CNC", "CNC Operator cum Programmer (Milling & Turning)"),
+                    Tuple.Create("TUR", "Turner / Precision Lathe Work"),
+                    Tuple.Create("TOOL_DIE", "Tool and Die Maker (Press Tools, Jigs & Fixtures)"),
+                    Tuple.Create("DRAUGHT_M", "Draughtsman (Mechanical / CAD Technician)"),
+                    Tuple.Create("DRAUGHT_C", "Draughtsman (Civil / Structural)"),
+                    Tuple.Create("WEL", "Welder (Gas, Electric, TIG / MIG Welding)"),
+                    Tuple.Create("SHEET_MET", "Sheet Metal Worker / Enclosure Fabrication"),
+                    Tuple.Create("ELECTRO", "Electroplating & Surface Finishing"),
+                    Tuple.Create("COPA", "Computer Operator & Programming Assistant (COPA)"),
+                    Tuple.Create("ICTSM", "Information & Communication Technology (ICTSM)"),
+                    Tuple.Create("STENO", "Stenography & Secretarial Practice"),
+                    Tuple.Create("QA_NDT", "Quality Assurance & Non-Destructive Testing (NDT)"),
+                    Tuple.Create("VOCATIONAL", "Vocational Training (Technical Trades)"),
+                    Tuple.Create("APPR", "National Apprenticeship Training (General)"),
+                    Tuple.Create("OTHER", "Other Technical Trade (Specify in Specialization)")
+                };
+
+                foreach (string mainCode in lrdeMains)
+                {
+                    foreach (var trade in lrdeTrades)
+                    {
+                        using (OracleCommand cmd = new OracleCommand(@"
+                            MERGE INTO EDU_QUAL_SUB dest
+                            USING (SELECT :MQ AS MQ, :SC AS SC, :SN AS SN FROM DUAL) src
+                            ON (dest.MAIN_QUAL_CODE = src.MQ AND dest.SUB_CODE = src.SC)
+                            WHEN NOT MATCHED THEN INSERT (MAIN_QUAL_CODE, SUB_CODE, SUB_NAME, IS_ACTIVE)
+                            VALUES (src.MQ, src.SC, src.SN, 1)
+                            WHEN MATCHED THEN UPDATE SET dest.SUB_NAME = src.SN, dest.IS_ACTIVE = 1", conn))
+                        {
+                            cmd.Parameters.Add(new OracleParameter("MQ", mainCode));
+                            cmd.Parameters.Add(new OracleParameter("SC", trade.Item1));
+                            cmd.Parameters.Add(new OracleParameter("SN", trade.Item2));
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
+                }
+
+                // Global fallback entries with MAIN_QUAL_CODE IS NULL
+                foreach (var trade in lrdeTrades)
+                {
+                    using (OracleCommand cmd = new OracleCommand(@"
+                        MERGE INTO EDU_QUAL_SUB dest
+                        USING (SELECT :SC AS SC, :SN AS SN FROM DUAL) src
+                        ON (dest.MAIN_QUAL_CODE IS NULL AND dest.SUB_CODE = src.SC)
+                        WHEN NOT MATCHED THEN INSERT (MAIN_QUAL_CODE, SUB_CODE, SUB_NAME, IS_ACTIVE)
+                        VALUES (NULL, src.SC, src.SN, 1)", conn))
+                    {
+                        cmd.Parameters.Add(new OracleParameter("SC", trade.Item1));
+                        cmd.Parameters.Add(new OracleParameter("SN", trade.Item2));
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+
+                // 5. Ensure standard Certifying Authorities and Vocational Bodies exist in EDU_UNIVERSITY
+                if (TableExists(conn, "EDU_UNIVERSITY"))
+                {
+                    string[] certifyingBodies = new string[]
+                    {
+                        "National Council for Vocational Training (NCVT) / DGT",
+                        "Directorate General of Training (DGT), Ministry of Skill Development",
+                        "Defence Research and Development Organisation (DRDO / LRDE)",
+                        "Centre for Development of Advanced Computing (C-DAC)",
+                        "National Institute of Electronics & Information Technology (NIELIT / DOEACC)",
+                        "State Board of Technical Education and Training (SBTET / DTE)",
+                        "Other Recognized Certifying Body / Institute"
+                    };
+
+                    foreach (string body in certifyingBodies)
+                    {
+                        try
+                        {
+                            using (OracleCommand cmd = new OracleCommand(@"
+                                MERGE INTO EDU_UNIVERSITY dest
+                                USING (SELECT :N AS N FROM DUAL) src
+                                ON (UPPER(TRIM(dest.UNIV_NAME)) = UPPER(TRIM(src.N)))
+                                WHEN NOT MATCHED THEN INSERT (UNIV_ID, UNIV_NAME, STATE_OR_TYPE, IS_ACTIVE)
+                                VALUES (NVL((SELECT MAX(UNIV_ID) + 1 FROM EDU_UNIVERSITY), 900), src.N, 'Certifying Body / Authority', 1)", conn))
+                            {
+                                cmd.Parameters.Add(new OracleParameter("N", body));
+                                cmd.ExecuteNonQuery();
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                InvalidateSubQualificationsCache();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("EnsureVocationalAndApprenticeshipMasterData Warning: " + ex.Message);
             }
         }
 
@@ -558,53 +741,273 @@ namespace EducationApp.Utils
         {
             string[] items = new string[]
             {
-                "MTRI|10 th|Secondary School",
-                "BMTRI|Less Than 10th|Secondary School",
-                "PUC|PRE UNIVERSITY COURSE|Higher Secondary",
-                "SCI|12 th|Higher Secondary",
-                "INTER|INTERMEDIATE OR PLUS 2|Higher Secondary",
-                "ITI|ITI|Vocational / Trade",
-                "CC|CERTIFICATE COURSE|Vocational / Trade",
-                "DIPL|DIPLOMA|Diploma",
-                "DENG|DIPLOMA IN ENGINEERING|Diploma",
-                "BE|BACHELOR OF ENGINEERING|Undergraduate",
-                "BTECH|BACHELOR OF TECHNOLOGY|Undergraduate",
-                "BSC|BACHELOR OF SCIENCE|Undergraduate",
-                "BCOM|BACHELOR OF COMMERCE|Undergraduate",
+                "ADST|ADVANCED DIPLOMA IN SCIENCE AND TECHNOLOGY|Diploma",
+                "AMD|DIPLOMA IN AVIATION MEDICINE|Degree",
+                "AMIE|AMIE/IETE|Degree",
+                "ATC|ADVANCED TRAINING CERTIFICATE|Vocational / Certificate",
+                "B ED|BACHELOR OF EDUCATION|Degree",
                 "BA|BACHOLER OF ARTS|Undergraduate",
-                "BCA|BACHELOR OF COMPUTER APP.|Undergraduate",
-                "BBA|BACHELOR OF BUSINESS ADMINSTRATION|Undergraduate",
-                "BBM|BACHELOR OF BUSINESS MANAGEMENT|Undergraduate",
-                "MBBS|BACHELOR OF MEDICINE & BACHELOR OF SURGERY|Undergraduate",
-                "BDS|BACHELOR OF DENTAL SURGERY|Undergraduate",
-                "LLB|BACHELOR OF LAWS|Undergraduate",
+                "BAL|BACHELOR OF ACADEMIC LAWS|Degree",
+                "BAM|BACHELOR OF AYURVEDIC MEDICINE|Degree",
+                "BAMS|BACHELOR OF AYURVEDIC MEDICINE AND SURGERY|Undergraduate",
                 "BARCH|BACHELOR OF ARCHITECTURE|Undergraduate",
-                "AMIE|AMIE/IETE|Undergraduate",
-                "BSCEN|BACHELOR OF SCIENCE (ENGG.)|Undergraduate",
-                "ME|MASTER OF ENGINEERING|Postgraduate",
-                "MTECH|MASTER OF TECHNOLOGY|Postgraduate",
-                "MSC|MASTER OF SCIENCE|Postgraduate",
-                "MCOM|MASTER OF COMMERCE|Postgraduate",
-                "MA|MASTER OF ARTS|Postgraduate",
-                "MCA|MASTER OF COMPUTER APPLICATIONS|Postgraduate",
-                "MBA|MASTER OF BUSINESS ADMINSTRATION|Postgraduate",
-                "MSW|MASTER OF SOCIAL WORK|Postgraduate",
+                "BBA|BACHELOR OF BUSINESS ADMINISTRATION|Undergraduate",
+                "BBM|BACHELOR OF BUSINESS MANAGEMENT|Undergraduate",
+                "BBS|BACHELOR OF BUSINESS STUDIES|Degree",
+                "BCA|BACHELOR OF COMPUTER APP.|Undergraduate",
+                "BCL|BACHELOR OF CIVIL LAWS|Degree",
+                "BCOM|BACHELOR OF COMMERCE|Undergraduate",
+                "BD|BACHELOR OF DRAMATICS|Degree",
+                "BDES|BACHELOR OF DESIGN|Undergraduate",
+                "BDNCE|BACHELOR OF DANCE|Degree",
+                "BDS|BACHELOR  OF DENTAL SURGERY|Undergraduate",
+                "BE|BACHELOR OF ENGINEERING|Undergraduate",
+                "BFA|BACHELOR OF FINE ARTS|Undergraduate",
+                "BFSC|BACHELOR OF FISHERIES SCIENCE|Undergraduate",
+                "BGL|BACHELOR OF GENERAL LAWS|Degree",
+                "BHM|BACHELOR OF HOTEL MANAGEMENT|Undergraduate",
+                "BHMS|BACHELOR OF HOMOEOPATHIC MEDICINE AND SURGERY|Undergraduate",
+                "BHRD|BACHELOR OF HUMAN RESOURCE DEVELOPMENT|Degree",
+                "BHSC|BACHELOR OF HOME SCIENCE|Degree",
+                "BIJ|BACHELOR OF JOURNALISM|Degree",
+                "BIJC|BACHELOR OF JOURNALISM AND COMMUNICATION|Degree",
+                "BIL|BACHELOR OF INDUSTRIAL LAW|Degree",
+                "BIM|BACHELOR OF INDIAN MEDICINE|Degree",
+                "BJMC|BACHELOR OF JOURNALISM AND MASS COMMUNICATION|Undergraduate",
+                "BLIB|BACHELOR OF LIBRARY SCIENCE|Undergraduate",
+                "BLISC|BACHELOR OF LIBRARY AND INFORMATION SCIENCE|Undergraduate",
+                "BLITT|BACHELOR OF LITERATURE|Degree",
+                "BMCJ|BACHELOR OF MASS COMMUNICATION AND JOURNALISM|Degree",
+                "BME|BACHELOR OF MECHANICAL ENGG|Degree",
+                "BMETT|BACHELOR OF METALLURGY|Degree",
+                "BMRSC|BACHELOR OF MEDICAL RESEARCH SCIENCE|Degree",
+                "BMS|BACHELOR OF MEDICINE AND SURGERY(HOMEO)|Degree",
+                "BMTRI|Less Than 10th|Secondary School",
+                "BNYS|BACHELOR OF NATUROPATHY AND YOGIC SCIENCES|Undergraduate",
+                "BOL|BACHELOR OF ORIENTAL LEARNING|Degree",
+                "BPA|BACHELOR OF PERFORMING ART|Degree",
+                "BPED|BACHELOR OF PHYSICAL EDUCATION|Degree",
+                "BPES|BACHELOR OF PHYSICAL EDUCATION AND SPORT SCIENCES|Degree",
+                "BPHARM|BACHELOR OF PHARMACY|Undergraduate",
+                "BPLAN|BACHELOR OF PLANNING|Undergraduate",
+                "BPT|BACHELOR OF PHYSIOTHERAPY|Undergraduate",
+                "BRS|BACHELOR OF RURAL STUDIES|Degree",
+                "BSAM|BACHELOR OF SHUDDHA AURVEDIC MEDICINE|Degree",
+                "BSC|BACHELOR OF SCIENCE|Undergraduate",
+                "BSCEN|BACHELOR OF SCIENCE (ENGG.)|Degree",
+                "BSOSC|BACHELOR OF SOCIAL SCIENCE|Degree",
+                "BSTAT|BACHELOR OF STATISTICS|Undergraduate",
+                "BSW|BACHELOR OF SOCIAL WORK|Undergraduate",
+                "BT|BACHELOR OF TEACHING|Degree",
+                "BTECH|BACHELOR OF TECHNOLOGY|Undergraduate",
+                "BTEXT|BACHELOR OF TEXTILES|Degree",
+                "BTH|BACHELOR OF THEOLOGY|Degree",
+                "BTHO|BACHELOR OF OCCUPATIONAL THERAPY|Degree",
+                "BUMMS|BACHELOR OF UNANI MEDICENE WITH MORDERN MEDICINE AND SURGERY|Degree",
+                "BUMS|BACHELOR OF UNANI MEDICINE AND SURGERY|Degree",
+                "BUTS|BACHELOR OF UNANI TIB AND SURGERY|Degree",
+                "BVA|BACHELOR OF VISUAL ARTS|Degree",
+                "BVASC|BACHELOR OF VERTERINARY ANIMAL SCIENCE|Degree",
+                "BVOC|BACHELOR OF VOCATIONAL STUDIES|Undergraduate",
+                "BVSAH|BACHELOR OF VERTERINARY SCIENCE AND ANIMAL HUSBANDRY|Degree",
+                "BVSC|BACHELOR OF VETERINARY SCIENCE|Undergraduate",
+                "CA|CHARTERED ACCOUNTANCY (ICAI)|Professional Certification",
+                "CC|CERTIFICATE COURSE|Vocational / Certificate",
+                "CFA|CHARTERED FINANCIAL ANALYST|Professional Certification",
+                "CMA|COST AND MANAGEMENT ACCOUNTANCY (ICMAI)|Professional Certification",
+                "CS|COMPANY SECRETARY (ICSI)|Professional Certification",
+                "DA|DIPLOMA IN ANAESTHESIA|Diploma",
+                "DAM|DIPLOMA IN AYURVEDIC MEDICINE|Diploma",
+                "DAYM|DOCTOR OF AYURVEDIC MEDICINE|Diploma",
+                "DBA|DIPLOMA IN BUSINESS MANAGEMENT|Diploma",
+                "DCD|DIPLOMA IN CHEST DISEASES|Diploma",
+                "DCE|DIPLOMA IN CIVIL ENGINEERING|Diploma",
+                "DCH|DIPLOMA IN  CHILD HEALTH|Diploma",
+                "DCL|DOCTOR OF CIVIL LAWS|Diploma",
+                "DCP|DIPLOMA IN CLINICAL PATHOLOGY|Diploma",
+                "DCPM|DIPLOMA IN  CLINICAL PATHOLOGY AND MICROBIOLOGY|Diploma",
+                "DD|DIPLOMA IN  DERMATOLOGY|Diploma",
+                "DDM|DIPLOMA IN  DERMATOLOGICAL MEDICINE|Diploma",
+                "DDR|DIPLOMA IN DIAGNOSTIC RADIOLOGY|Diploma",
+                "DDVD|DIPLOMA IN DERMATOLOGY AND VENEREAL DISEASES|Diploma",
+                "DE|DIPLOMA IN EMBRYOLOGY|Diploma",
+                "DECE|DIPLOMA IN ELECTRONICS AND COMMUNICATION ENGINEERING|Diploma",
+                "DED|DOCTOR OF EDUCATION|Diploma",
+                "DEE|DIPLOMA IN ELECTRICAL ENGINEERING|Diploma",
+                "DENG|DIPLOMA IN ENGINEERING|Diploma",
+                "DENGG|DOCTOR OF ENGINEERING|Diploma",
+                "DFM|DIPLOMA IN FORENSIC MEDICINE|Diploma",
+                "DGO|DIPLOMA IN GYNACOLOGY AND OBSTRICTS|Diploma",
+                "DH|DIPLOMA IN INDUSTRIAL HEALTH|Diploma",
+                "DHE|DIPLOMA IN HEALTH EDUCATION|Diploma",
+                "DHRM|DIPLOMA IN HUMAN RESOURCE MANAGEMENT|Diploma",
+                "DHY|DOCTOR OF HYGIENE|Diploma",
+                "DIIT|POST GRADUATE DIPLOMA OF IIT|Post Graduate Diploma",
+                "DIP|DIPLOMA IN PSYCHIARTRIC|Diploma",
+                "DIPL|DIPLOMA|Diploma",
+                "DIT|DIPLOMA IN INFORMATION TECHNOLOGY|Diploma",
+                "DIV|DIPLOMA IN VOCATIONAL EDUCATION|Diploma",
+                "DLE|DIPLOMA IN ELECTRICAL / ELECTRONICS ENGINEERING|Diploma",
+                "DLIB|DIPLOMA IN LIBRARY SCIENCE|Diploma",
+                "DLITT|DIPLOMA IN LITERATURE|Diploma",
+                "DLO|DIPLOMA IN LARYNGOLOGY AND OTOLOGY|Diploma",
+                "DLW|DIPLOMA IN LABOUR WELFARE|Diploma",
+                "DM|DOCTORATE OF MEDICINE (SUPER SPECIALTY)|Doctorate / Research",
+                "DMA|DOCTOR OF AURVEDIC MEDICINE|Diploma",
+                "DMCW|VMETERNITY AND CHILD WELFARE|Diploma",
+                "DME|DIPLOMA IN MEDICINAL ENGINEERING|Diploma",
+                "DMIT|DIPLOMA OF MADRAS INSTITUTE OF TECHNOLOGY|Diploma",
+                "DMLT|DIPLOMA IN MEDICAL LABORATORY TECHNOLOGY|Diploma",
+                "DMM|DIPLOMA IN MARKETING MANAGEMENT|Diploma",
+                "DMP|DIPLOMA IN  MEDICAL PATHOGY AND BACTERIOLOGY|Diploma",
+                "DMR|DIPLOMA IN MEDICAL RADIOLOGY|Diploma",
+                "DMRD|DIPLOMA IN MEDICAL RADIO DIANOSIS|Diploma",
+                "DMRE|DIPLOMA IN  MEDICAL RADIOLOLLGY AND ELECTROLOGY|Diploma",
+                "DMRIT|DIPLOMA IN  DIPLOMA IN RADIO ISTOTOPE|Diploma",
+                "DMRT|DIPLOMA IN  MEDICAL RADITION THERPY|Diploma",
+                "DMUS|DOCTOR OF MUSIC|Diploma",
+                "DNB|DIPLOMATE OF NATIONAL BOARD|Postgraduate",
+                "DO|DIPLOMA IN OPHOPAEDIC SURGERY|Diploma",
+                "DOEACCA|DOEACC 'A' LEVEL (PG DIPLOMA EQUIVALENT)|Post Graduate Diploma",
+                "DOEACCO|DOEACC 'O' LEVEL (DIPLOMA EQUIVALENT)|Diploma",
+                "DOL|DOCTOR OF ORIENTAL LEARNING|Diploma",
+                "DOMS|DIPLOMA IN  OPHALMIC MEDICINE AND SURGERY|Diploma",
+                "DPD|DIPLOMA IN PUBLIC ADMINISTRATION|Diploma",
+                "DPE|DIPLOMA IN PHYSICAL EDUCATION|Diploma",
+                "DPHIL|DOCTRATE IN PHILOSOPHY|Diploma",
+                "DPM|DIPLOMA IN  PSYCHOLOGICAL MEDICINE|Diploma",
+                "DPMNR|DIPLOMA IN PHYSICAL MEDICINE AND REHABILITATION|Diploma",
+                "DRE|DIPLOMA IN RADIO ENGINEERING|Diploma",
+                "DSC|DIPLOMA IN SCIENCES|Diploma",
+                "DSS|DIPLOMA IN SOCIAL SERVICE|Diploma",
+                "DSTD|DIPLOMA IN SEXUALLY TRANSMITED DISEASES|Diploma",
+                "DTCD|DIPLOMA IN TUBERCULOSIS AND CHEST DESEASES|Diploma",
+                "DTE|DIPLOMA IN TECHNICAL EDUCATION|Diploma",
+                "DTH|DOCTOR OF THEOLOGY|Diploma",
+                "DTMH|DIPLOMA IN TROPICAL MEDICINE AND HGIENE|Diploma",
+                "DUAL|DUAL DEGREE (INTEGRATED BE/BTECH + ME/MTECH)|Undergraduate",
+                "DUGA|DIPLOMA IN  URBAN GOVT. AND ADMINISTRATION|Diploma",
+                "DUM|DOCTOR OF UNANI MEDICINE|Diploma",
+                "DV|DIPLOMA IN VENERAEOLOGY|Diploma",
+                "DVND|DIPLOMA IN VENERAEOLOGY AND DERMETOLOGY|Diploma",
+                "EG|ENGINEERING GRADUATES|Degree",
+                "EPG|ENGINEERING POST GRADUATES|Degree",
+                "GDT|GRADUATE|Degree",
+                "GMP|GENERAL MANAGEMENT PROGRAMME (GMP)|Post Graduate Diploma",
+                "INTER|INTERMEDIATE OR PLUS 2|Higher Secondary / Pre-University",
+                "ITI|ITI|Vocational / Certificate",
+                "JD|DIPLOMA IN JOURNALISM|Degree",
+                "LLB|BACHELOR OF LAWS|Undergraduate",
+                "LLD|DOCTOR OF LAWS|Degree",
                 "LLM|MASTER OF LAWS|Postgraduate",
-                "MSENG|MASTER OF SCIENCE (ENGINEERING)|Postgraduate",
-                "MS|MASTER OF SURGERY|Postgraduate",
-                "MD|DOCTORATE IN MEDICINE|Postgraduate",
-                "MEd|MASTER OF EDUCATION|Postgraduate",
-                "B Ed|BACHELOR OF EDUCATION|Undergraduate",
-                "PHD|DOCTORATE IN PHILOSOPHY|Doctorate / Research",
+                "M ED|MASTER OF EDUCATION|Degree",
+                "MA|MASTER OF ARTS|Postgraduate",
+                "MAMM|MASTER OF AGRICULTURAL MARKETING MANAGEMENT|Degree",
+                "MARCH|MASTER OF ARCHITECHURE|Degree",
+                "MAS|MASTER OF APPLIED SCIENCE|Degree",
+                "MAYM|MASTER OF AYURVEDIC MEDICINE|Degree",
+                "MAYSC|MASTER OF AYURVEDIC SCIENCE|Degree",
+                "MBA|MASTER OF BUSINESS ADMINSTRATION|Postgraduate",
+                "MBBS|BACHELOR OF MEDICINE AND BACHELOR OF SURGERY|Undergraduate",
+                "MBF|MASTER OF BUSINESS FINANCE|Degree",
+                "MBM|MASTER OF BUSINESS MANAGEMENT|Degree",
+                "MBS|MASTER OF  BUSINESS STATISTICS|Degree",
+                "MCA|MASTER OF COMPUTER APPLICATIONS|Postgraduate",
+                "MCH|MASTER OF CHIRURGIAE (SUPER SPECIALTY)|Doctorate / Research",
+                "MCJ|MASTER OF COMMUNICATION AND JOURNALISM|Degree",
+                "MCL|MASTER OF COMPARITIVE LAWS|Degree",
+                "MCM|MASTER IN COMPUTER MANAGEMENT|Degree",
+                "MCOM|MASTER OF COMMERCE|Postgraduate",
+                "MCP|MASTER OF CITY PLANNING|Degree",
+                "MCRP|MASTER OF CITY AND REGIONAL PLANNING|Degree",
+                "MCT|MASTER OF COLLEGE TEACHING|Degree",
+                "MD|DOCTRATE IN MEDICINE|Postgraduate",
+                "MDAY|DOCTOR OF MEDICINE (AYURVEDIC)|Degree",
+                "MDES|MASTER OF DESIGN|Postgraduate",
+                "MDS|MASTER OF DENTAL SURGERY|Degree",
+                "ME|MASTER OF ENGINEERING|Postgraduate",
+                "MFA|MASTER OF FINE ARTS|Postgraduate",
+                "MFC|MASTER OF FINANCE AND CONTROL|Degree",
+                "MFOOD|MASTER OF FOOD AND TECHNOLOGY|Degree",
+                "MFSC|MASTER OF FISHERIES SCIENCE|Degree",
+                "MHED|MASTER OF HIGHER EDUCATION|Degree",
+                "MHSC|MASTER OF HOME SCIENCE|Degree",
+                "MIRPM|MASTER OF  RELATION AND PERSONNEL MANG|Degree",
+                "MJ|MASTER OF JOURNALISM|Degree",
+                "MJMC|MASTER OF JOURNALISM AND MASS COMMUNICATION|Postgraduate",
+                "MLIB|MASTER OF LIBRARY SCIENCE|Degree",
+                "MLIS|MASTER OF  LIBRARY AND INFORMATION SCIENCE|Degree",
+                "MLITT|MASTER OF LITERATURE OR LETTERS|Degree",
+                "MLS|MASTER OF LABOUR STUDIES|Degree",
+                "MLW|MASTER OF LABOUR WELFARE|Degree",
+                "MMED|MASTER OF SCIENCE  MEDICAL|Degree",
+                "MMS|MASTER OF MANAGEMENT STUDIES|Degree",
+                "MMSC|MASTER OF MANGEMENT SCIENCE|Degree",
+                "MPE|MASTER OF PHYSICAL EDUCATION|Degree",
+                "MPES|MASTER OF PHYSICAL EDUCATION AND SPORTS|Degree",
+                "MPH|MPHIL|Doctorate / Research",
+                "MPHARM|MASTER OF PHARMACY|Postgraduate",
                 "MPHIL|MASTER OF PHILOSOPHY|Doctorate / Research",
-                "PGD|POST GRADUATE DIPLOMA|Post Graduate Diploma",
-                "OTHER|OTHER|Other"
+                "MPLAN|MASTER OF PLANNING|Postgraduate",
+                "MPM|MASTER OF  PHYSICAL MANAGEMENT|Degree",
+                "MPT|MASTER OF PHYSIOTHERAPY|Postgraduate",
+                "MRP|MASTER OF REGIONAL PLANNING|Degree",
+                "MRS|MASTER OF  RURAL STUDIES|Degree",
+                "MS|MASTER OF SURGERY|Postgraduate",
+                "MSC|MASTER OF SCIENCE|Postgraduate",
+                "MSEE|MASTER OF SCIENCE IN ELECTRICAL ENGINEERING|Postgraduate",
+                "MSENG|MASTER OF SCIENCE (ENGINEERING)|Degree",
+                "MSTAT|MASTER OF STATISTICS|Postgraduate",
+                "MSW|MASTER OF SOCIAL WORK|Postgraduate",
+                "MTA|MASTER OF TOURISM ADMINISTRATION|Degree",
+                "MTECH|MASTER OF TECHNOLOGY|Postgraduate",
+                "MTH|MASTER OF THEOLOGY|Degree",
+                "MTP|MASTER OF TOWN PLANNING|Degree",
+                "MTRI|10 th|Secondary School",
+                "MURP|MASTER OF URBAN AND REGIONAL PLANNING|Degree",
+                "MVOC|MASTER OF VOCATIONAL STUDIES|Postgraduate",
+                "MVSC|MASTER OFVERTINARY SCIENCE|Degree",
+                "NAC|NATIONAL APPRENTICESHIP CERTIFICATE|Vocational / Certificate",
+                "NCVT|NATIONAL COUNCIL FOR VOCATIONAL TRAINING CERTIFICATE|Vocational / Certificate",
+                "NTC|NATIONAL TRADE CERTIFICATE|Vocational / Certificate",
+                "OTHER|OTHER|Degree",
+                "PG|POST GRADUATE|Degree",
+                "PGD|POST GRADUATE DIPLOMA|Degree",
+                "PGDBA|POST GRADUATE DIPLOMA IN BUSINESS ADMINISTRATION|Post Graduate Diploma",
+                "PGDCA|POST GRADUATE DIPLOMA IN COMPUTER APPLICATIONS|Postgraduate",
+                "PGDCS|POST GRADUATE DIPLOMA IN COMPUTER SCIENCE|Post Graduate Diploma",
+                "PGDFM|POST GRADUATE DIPLOMA IN FINANCIAL MANAGEMENT|Post Graduate Diploma",
+                "PGDHRM|POST GRADUATE DIPLOMA IN HUMAN RESOURCE MANAGEMENT|Post Graduate Diploma",
+                "PGDIIT|POST GRADUATE DIIT|Post Graduate Diploma",
+                "PGDIM|POST GRADUATE DIPLOMA IN INDUSTRIAL MANAGEMENT|Post Graduate Diploma",
+                "PGDIR|POST GRADUATE DIPLOMA IN INDUSTRIAL RELATIONS|Post Graduate Diploma",
+                "PGDM|POST GRADUATE DIPLOMA IN MANAGEMENT|Postgraduate",
+                "PGDMM|POST GRADUATE DIPLOMA IN MATERIALS / MARKETING MANAGEMENT|Post Graduate Diploma",
+                "PGDPM|POST GRADUATE DIPLOMA IN PERSONNEL MANAGEMENT|Post Graduate Diploma",
+                "PGDVLSI|POST GRADUATE DIPLOMA IN VLSI DESIGN|Post Graduate Diploma",
+                "PHD|DOCTORATE IN PHILOSOPHY|Doctorate / Research",
+                "PHDD|PHD (DOCTORATE)|Doctorate / Research",
+                "POSTDIP|POST DIPLOMA COURSE|Diploma",
+                "PPC|PRE PROFESSIONAL COURSE|Degree",
+                "PSY|MASTER OF PSYCHOLOGY|Degree",
+                "PUC|PRE UNIVERSITY COURSE|Higher Secondary / Pre-University",
+                "SCI|12 th|Higher Secondary / Pre-University",
+                "SOCIO|MASTER OF SOCIOLOGY|Degree",
+                "STENO|CERTIFICATE IN STENOGRAPHY|Vocational / Certificate",
+                "TD|DIPLOMA IN  TEACHING|Degree",
+                "TTE|TRANING FOR TEACHING ENGLISH|Degree",
+                "TTG|TRANING OF TEACHERS IN GEOGRAPHY|Degree",
+                "UG|Undergraduate|Degree",
             };
 
             foreach (var item in items)
             {
                 var parts = item.Split('|');
-                using (OracleCommand cmd = new OracleCommand("INSERT INTO EDU_QUAL_MAIN (QUAL_CODE, QUAL_NAME, QUAL_CATEGORY, IS_ACTIVE) VALUES (:C, :N, :CAT, 1)", conn))
+                using (OracleCommand cmd = new OracleCommand(@"
+                    MERGE INTO EDU_QUAL_MAIN dest
+                    USING (SELECT :C AS C, :N AS N, :CAT AS CAT FROM DUAL) src
+                    ON (dest.QUAL_CODE = src.C)
+                    WHEN NOT MATCHED THEN INSERT (QUAL_CODE, QUAL_NAME, QUAL_CATEGORY, IS_ACTIVE) VALUES (src.C, src.N, src.CAT, 1)", conn))
                 {
                     cmd.Parameters.Add(new OracleParameter("C", parts[0]));
                     cmd.Parameters.Add(new OracleParameter("N", parts[1]));
@@ -829,85 +1232,428 @@ namespace EducationApp.Utils
                 "21|University of Mysore, Mysuru",
                 "22|Mangalore University, Konaje",
                 "23|Kuvempu University, Shankaraghatta, Shivamogga",
+                "24|Annamalai University",
                 "25|Jawaharlal Nehru Technological University Kakinada (JNTUK)",
                 "26|Jawaharlal Nehru Technological University Anantapur (JNTUA)",
                 "27|Acharya Nagarjuna University, Guntur",
                 "28|Osmania University, Hyderabad",
+                "29|Sri Venkateswara University",
                 "30|University of Hyderabad (UoH / Central University), Hyderabad",
+                "31|Bharathiar University",
+                "32|Bharathidasan University",
                 "33|University of Madras, Chennai",
+                "34|Rajasthan University",
+                "35|Kakatiya University",
+                "36|Manonmani Sundaranathan University",
+                "37|Sastra University",
                 "38|Cochin University of Science and Technology (CUSAT), Kochi",
+                "39|Vikram University, Ujjain",
                 "40|Maulana Azad National Institute of Technology (MANIT), Bhopal",
+                "41|Jainarayan Vayas University, Jodhpur",
+                "42|Gulbarga University, Gulbarga",
                 "43|Madurai Kamaraj University (MKU), Madurai",
                 "44|Jawaharlal Nehru University (JNU), New Delhi",
                 "45|University of Delhi (DU), New Delhi",
+                "46|Pondicherry University",
+                "47|U BTE Roorkee",
                 "48|University of Kerala, Thiruvananthapuram",
                 "49|National Institute of Technology (NIT / REC), Hamirpur",
                 "50|Mahatma Gandhi University, Kerala",
                 "51|Sardar Vallabhbhai National Institute of Technology (SVNIT), Surat",
+                "52|Gurunanak Dev University, Punjab",
+                "54|RD University",
                 "55|Rajiv Gandhi Proudyogiki Vishwavidyalaya (RGPV), Bhopal",
                 "56|Indian Institute of Technology (IIT), Bombay",
+                "57|BIT Mesra Ranchi",
+                "58|IAT,Pune",
+                "60|Avadh University",
                 "61|Utkal University, Bhubaneswar",
+                "63|Geherwal University",
+                "64|Allahabad University",
                 "65|University of Calicut, Malappuram",
+                "66|IETE, New Delhi",
+                "67|Institution of Engineers, New Delhi",
                 "68|Motilal Nehru National Institute of Technology (MNNIT), Allahabad",
+                "69|MNB Garwal University",
+                "70|MERRUT University",
                 "71|Savitribai Phule Pune University (SPPU / University of Pune)",
                 "73|University of Calcutta (Calcutta University), Kolkata",
                 "74|Deen Dayal Upadhyaya Gorakhpur University (DDU), Gorakhpur",
+                "76|Dr.H.S.Gaur University, Sagar",
+                "77|Barkatulla University, Bhopal",
                 "78|University of Lucknow, Lucknow",
+                "79|Kumoan University, Nainital",
+                "80|BITS Ranchi",
+                "81|Bundel Khand University",
+                "82|Dayalbagh University",
+                "83|REC, Bhalki",
                 "84|Aligarh Muslim University (AMU), Aligarh",
+                "85|Ranchi University",
                 "86|National Institute of Technology (NIT / REC), Rourkela",
+                "87|Sambalpur University, Orissa",
+                "88|AIMA,New Delhi",
                 "89|Indira Gandhi National Open University (IGNOU), New Delhi",
+                "90|MIT,Madras",
+                "92|Jabalpur University",
+                "94|Burdwan University",
                 "95|National Institute of Technology (NIT / REC), Durgapur",
                 "96|Mahatma Jyotiba Phule Rohilkhand University (MJPRU), Bareilly",
+                "97|Maharshi Dayanand University, Rohtak",
+                "98|Gujarat University",
+                "99|B.S.B.A University, Muz,Bihar",
+                "101|South Gujarat University",
                 "102|Dr. B. R. Ambedkar National Institute of Technology (NIT), Jalandhar",
                 "103|Jamia Millia Islamia (JMI), New Delhi",
+                "104|Amaravati University",
+                "105|Marthwada University",
+                "106|Centre for Electronics Design Technology",
+                "107|MANIPUR UNIVERSITY",
+                "108|Army University",
                 "109|Panjab University, Chandigarh",
+                "110|IAI",
+                "111|Bhopal University",
+                "112|Punjab Technical University",
+                "113|Dr.Ambedkar University",
+                "115|M.B.T.I Kanpur",
+                "116|I.E.T, C.S.J.M University Kanpur",
+                "117|D.A.V.V, Indore",
+                "118|Meghalaya Board of School Education",
                 "119|North-Eastern Hill University (NEHU), Shillong",
+                "121|Assam University",
+                "122|Institution of Engineers(India), Kolkatta",
+                "123|Govind Ballabh Pant University of Agriculture and Technology",
                 "125|Patna University, Patna",
+                "126|DOEACC Centre",
+                "127|NIIT Ltd.",
+                "128|VIDYASAGAR UNIVERSITY",
                 "129|Visvesvaraya Technological University (VTU), Belagavi",
+                "130|University of Kalyani",
+                "131|Bengal Engineering College, Shibpore",
+                "132|Pt. RaviShankar University, Raipur",
+                "134|Sri KrishnaDevaraya University",
+                "135|Nagpur University",
+                "136|Kannur University",
+                "137|V B University, Hazaribagh",
+                "139|IIMM,Bangalore",
                 "140|National Institute of Technology (NIT), Jamshedpur",
                 "146|National Institute of Technology (NIT), Kurukshetra",
+                "147|Govind Ballab Pant Engg. College",
+                "148|UPTUI, KNIT",
+                "149|UP BTE, Lucknow",
+                "150|West Bengal University",
                 "151|ABV-Indian Institute of Information Technology and Management (ABV-IIITM), Gwalior",
+                "152|BES University",
+                "153|DIAT, Pune",
+                "154|Kurukshetra University",
                 "156|National Institute of Technology (NIT), Raipur",
                 "158|National Institute of Technology (NIT), Patna",
+                "160|Dilasagram Convent high school, ballarpur",
+                "161|Gurunanak College of Science, Ballarpur",
+                "162|Govt. College of Engineering, Karad",
                 "163|Indian Institute of Information Technology (IIIT), Allahabad",
+                "164|U A Board",
+                "165|UP Board Allahabad",
                 "166|Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru",
                 "167|Department of Pre-University Education (PUE), Karnataka",
+                "169|General Education Department",
+                "170|Higher Secondary Board",
+                "171|BTER Jodhpur",
                 "172|West Bengal Board of Secondary Education (WBBSE)",
                 "173|West Bengal Council of Higher Secondary Education (WBCHSE)",
+                "176|Board of Secondary School Education",
+                "177|Board of Intermediate Education",
+                "178|IIT, Bangalore",
+                "179|BIT, Durg",
+                "180|MP Board",
                 "181|State Board of Technical Education and Training (SBTET), Tamil Nadu",
+                "189|State board of technical Education",
+                "190|Kerala Board",
+                "194|ICSE/DPS, shimla",
+                "195|CBSE/RED, Jhajjar",
+                "196|K V Ponda (CBSE)",
+                "197|Board of Public Exam. Kerala",
+                "198|Board of Technical Education",
+                "199|Z P High school",
+                "200|Dept.of Tech.Edu, Kerala",
+                "201|Board of Vocational HR SEC Edn",
+                "203|UP Board",
                 "204|Bihar School Examination Board (BSEB), Patna",
+                "205|BIEE, Bihar",
+                "206|V.B.U, Hazaribag",
+                "207|PSG College of Technology, Coimbatore",
+                "209|MAGADH UNIVERSITY BODH GAYA",
+                "210|BIEC PATNA",
+                "211|Veer Kunwar Singh University, ARA",
+                "212|BSE, AP",
+                "213|BIE, AP",
+                "214|University of Bradford",
+                "215|B.T.E UP",
+                "216|Govt of A.P, Dept of Emp and Training",
+                "217|Ministry of Labour and EMP",
+                "218|Pre University Board",
                 "219|West Bengal State Council of Technical and Vocational Education (WBSCTE), Kolkata",
+                "220|Jiwaji University",
                 "221|Central Board of Secondary Education (CBSE), New Delhi",
                 "223|Indian Institute of Technology (IIT), Gandhinagar",
+                "224|VVB SS School",
+                "225|CM science College,Darbhanga (BSEB)",
                 "226|Indian Institute of Technology (IIT), Patna",
+                "228|Dept. Tech. Edu., Karnataka",
+                "229|S.B.T.E Bihar",
+                "230|B.S.E.H",
+                "231|H.S.B.T.E",
+                "232|UTTARAKHAND TECHNICAL UNIVERSITY",
+                "233|NATIONAL COLLEGE BANGALORE",
+                "234|ST. JOSEPHS COLLEGE BANGALORE",
+                "235|SSC BOARD",
+                "236|INTER BOARD",
+                "238|VINAYAKA MISSION UNIVERSITY SALEM",
+                "239|CETE STQC,Hyderabad",
+                "240|IDEMI MUMBAI",
+                "241|Karnataka Board",
+                "242|BSE, ODISHA",
+                "243|HSCE, ODISHA",
+                "244|SCTE and VT, ODISHA",
+                "245|Sikkim Manipal University",
+                "246|B.S.E.R, AJMER",
+                "247|B.T.E.R, Jodhpur",
+                "249|AMITE",
+                "250|Pune Board",
+                "251|Mumbai Board",
+                "252|P E C, Chandigarh",
+                "253|RGUKT, Basar",
+                "254|Nashik Board",
+                "255|Automomous. Inst of Govt of Maharashtra",
+                "256|Himachal Pradesh University Shimla Himachal Pradesh",
+                "257|HP BOARD OF SCHOOL EDUCATION DHARAMSHAL HIMACHAL PRADESH",
+                "258|ASSAM STATE BOARD",
+                "261|DREXEL UNIVERSITY, PA, USA",
+                "262|BIHAR INTERMEDIATE EDUCATION COUNCIL, PATNA",
+                "263|Biju Patnaik University of Technology, Orissa, Rourkela",
                 "264|Jawaharlal Nehru Technological University (JNTU), Hyderabad",
+                "265|Karnataka State Open University",
+                "266|Shivaji University, Kolhapur",
+                "267|Bharati Vidypeetha University, Pune",
+                "268|VHSE BOARD",
+                "269|Board of Hariyana",
+                "270|Oxford Evening Polytechnic, JP Nagar, Bengaluru",
+                "272|GPM College",
+                "273|GRM Sr Sec School",
                 "274|National Council for Vocational Training (NCVT)",
                 "275|Indian Institute of Technology (IIT), Jodhpur",
+                "277|Tripura",
                 "278|Indian Institute of Management (IIM), Lucknow",
+                "279|AP Board",
+                "280|Tamilnadu State Board",
                 "281|Central University of Rajasthan, Ajmer",
+                "282|University of Ajmer",
                 "283|National Institute of Technology (NIT), Agartala",
                 "284|Dr. A.P.J. Abdul Kalam Technical University (AKTU / UPTU), Lucknow",
+                "285|CHSE, ODISHA",
+                "286|CHSS, Jaipur",
+                "287|JNVU, JODHPUR",
                 "289|Indian Institute of Technology (IIT), Indore",
                 "290|National Institute of Technology (NIT), Delhi",
+                "292|GGV, Bilaspur",
+                "293|UTTARAKHAND BOARD",
+                "294|GRAPHIC ERA UNIVERSITY",
+                "296|VIT, PUNE",
                 "297|Maharashtra State Board of Secondary and Higher Secondary Education (MSBSHSE)",
                 "298|National Institute of Technology (NIT), Srinagar",
+                "299|Siddarth University",
+                "300|RBSE, Ajmer",
+                "301|Rajasthan board",
+                "302|Banarthali University",
                 "304|Board of Secondary Education, Assam (SEBA)",
+                "305|SCTE, Assam",
+                "306|NERIST, Nirjuli",
                 "307|Indian Institute of Technology (IIT), Hyderabad",
+                "309|TRRRSVM MIC Kashipur",
                 "310|Indian Institute of Technology (IIT), Mandi",
+                "311|KV Bhaderwah",
+                "312|BSF Sr Sec School",
+                "314|MIT Muzaharpur",
+                "315|YMCA University",
+                "317|SDM Sr Sec School",
+                "318|Green Meadows",
+                "319|G.B.P.U.A.T, Pantnagar",
+                "320|KV (AFS), Bormer",
+                "321|Dundlod Public School Jhunjhunu",
+                "322|KVM Public Sr Sec School, Sikar",
                 "323|Indian Institute of Technology (BHU), Varanasi",
+                "324|CMM Jabalpur",
                 "325|Indian Institute of Technology (IIT), Ropar",
+                "326|BVDU, Pune",
+                "327|MIT-SDE, Pune",
+                "328|GOVT.POLYTECHNIC BANKA",
+                "329|DNS COLLEGE BHUSIARAJOUN",
+                "330|H.S.SALEMPUR",
+                "331|SBTE, Bihar",
+                "332|JAC board",
+                "333|SBTE Jharkhand",
+                "334|SSIS,DERABASSI",
+                "335|GMSSS,CHANDIGARH SEC-16",
+                "336|GGDSD,PUNJAB UNIVERSITY",
+                "337|SSK NAND INTERCOLL",
                 "338|Indian Institute of Technology (IIT), Bhubaneswar",
+                "339|S.V GOVT POLYTECHNIC",
                 "340|Council for the Indian School Certificate Examinations (CISCE / ICSE / ISC)",
                 "342|Uttarakhand Board of Technical Education, Roorkee (UBTER)",
                 "344|Assam Higher Secondary Education Council (AHSEC)",
+                "348|Hemwanti Nandan Bahuguna Garhwal University",
+                "349|MADAN MOHAN MALAVIYA UNIVERSITY OF TECHNOLOGY, GORAKHPUR, UP",
+                "352|APJ Abdul Kalam Technological University (KTU), Kerala",
+                "353|Gujarat Technological University (GTU), Ahmedabad",
+                "355|University of Mumbai (Mumbai University)",
+                "358|Jadavpur University, Kolkata",
+                "360|Punjabi University, Patiala",
+                "364|Gauhati University, Guwahati",
+                "365|University of Jammu, Jammu",
+                "366|University of Kashmir, Srinagar",
+                "369|Tezpur University, Assam",
+                "370|Visva-Bharati University, Santiniketan",
+                "373|Central University of Karnataka, Kalaburagi",
+                "374|Central University of Tamil Nadu, Thiruvarur",
+                "375|Central University of Kerala, Kasaragod",
+                "376|Central University of Andhra Pradesh, Anantapur",
+                "378|Central University of Gujarat, Gandhinagar",
+                "379|Central University of Punjab, Bathinda",
+                "380|Central University of Haryana, Mahendragarh",
+                "381|Central University of South Bihar, Gaya",
+                "382|Central University of Jharkhand, Ranchi",
+                "383|Central University of Odisha, Koraput",
+                "384|Central University of Jammu, Samba",
+                "385|Central University of Kashmir, Ganderbal",
+                "386|Central University of Himachal Pradesh, Dharamshala",
+                "391|IIT (ISM) Dhanbad",
+                "398|IIT Tirupati",
+                "399|IIT Palakkad",
+                "400|IIT Dharwad",
+                "401|IIT Bhilai",
+                "402|IIT Goa",
+                "403|IIT Jammu",
+                "409|Visvesvaraya National Institute of Technology (VNIT), Nagpur",
+                "422|National Institute of Technology (NIT), Goa",
+                "424|National Institute of Technology (NIT), Meghalaya",
+                "425|National Institute of Technology (NIT), Manipur",
+                "426|National Institute of Technology (NIT), Mizoram",
+                "428|National Institute of Technology (NIT), Sikkim",
+                "429|National Institute of Technology (NIT), Arunachal Pradesh",
+                "430|National Institute of Technology (NIT), Uttarakhand",
+                "431|National Institute of Technology (NIT), Andhra Pradesh",
+                "432|Indian Institute of Engineering Science and Technology (IIEST), Shibpur",
+                "433|IIIT Hyderabad",
+                "434|IIIT Bangalore",
+                "435|IIIT Delhi (Indraprastha Institute of Information Technology)",
+                "438|PDPM IIITDM Jabalpur",
+                "439|IIITDM Kancheepuram",
+                "440|IIITDM Kurnool",
+                "441|IIIT Lucknow",
+                "442|IIIT Pune",
+                "443|IIIT Kota",
+                "444|IIIT Sri City",
+                "445|IIIT Vadodara",
+                "446|IIIT Guwahati",
+                "447|Indian Institute of Management (IIM), Ahmedabad",
+                "448|Indian Institute of Management (IIM), Bangalore",
+                "449|Indian Institute of Management (IIM), Calcutta",
+                "452|Indian Institute of Management (IIM), Indore",
+                "453|Indian Institute of Management (IIM), Shillong",
+                "454|Indian Institute of Management (IIM), Rohtak",
+                "455|Indian Institute of Management (IIM), Ranchi",
+                "456|Indian Institute of Management (IIM), Raipur",
+                "457|Indian Institute of Management (IIM), Tiruchirappalli",
+                "458|Indian Institute of Management (IIM), Udaipur",
+                "459|Indian Institute of Management (IIM), Kashipur",
+                "460|Indian Institute of Management (IIM), Visakhapatnam",
+                "461|Indian Institute of Management (IIM), Bodh Gaya",
+                "462|Indian Institute of Management (IIM), Amritsar",
+                "463|Indian Institute of Management (IIM), Nagpur",
+                "464|Indian Institute of Management (IIM), Sambalpur",
+                "465|Indian Institute of Management (IIM), Sirmaur",
+                "466|Indian Institute of Management (IIM), Jammu",
+                "467|Indian Institute of Management (IIM), Mumbai",
+                "468|All India Institute of Medical Sciences (AIIMS), New Delhi",
+                "469|All India Institute of Medical Sciences (AIIMS), Bhopal",
+                "470|All India Institute of Medical Sciences (AIIMS), Bhubaneswar",
+                "471|All India Institute of Medical Sciences (AIIMS), Jodhpur",
+                "472|All India Institute of Medical Sciences (AIIMS), Patna",
+                "473|All India Institute of Medical Sciences (AIIMS), Raipur",
+                "474|All India Institute of Medical Sciences (AIIMS), Rishikesh",
+                "475|Postgraduate Institute of Medical Education and Research (PGIMER), Chandigarh",
+                "476|Jawaharlal Institute of Postgraduate Medical Education and Research (JIPMER), Puducherry",
+                "477|National Institute of Mental Health and Neurosciences (NIMHANS), Bangalore",
+                "478|Christian Medical College (CMC), Vellore",
+                "480|Kasturba Medical College (KMC), Manipal",
+                "481|Rajiv Gandhi University of Health Sciences (RGUHS), Karnataka",
+                "482|Dr. MGR Educational and Research Institute / Medical University, Tamil Nadu",
+                "483|NTR University of Health Sciences (Dr. YSR UHS), Vijayawada",
+                "484|Kaloji Narayana Rao University of Health Sciences (KNRUHS), Warangal",
+                "485|Maharashtra University of Health Sciences (MUHS), Nashik",
+                "486|Kerala University of Health Sciences (KUHS), Thrissur",
+                "487|Manipal Academy of Higher Education (MAHE), Manipal",
+                "488|Vellore Institute of Technology (VIT), Vellore",
+                "489|Vellore Institute of Technology (VIT), Chennai",
+                "490|SRM Institute of Science and Technology, Chennai",
+                "491|Thapar Institute of Engineering and Technology, Patiala",
+                "492|Amrita Vishwa Vidyapeetham, Coimbatore",
+                "493|Kalinga Institute of Industrial Technology (KIIT), Bhubaneswar",
+                "495|Symbiosis International University, Pune",
+                "496|Narsee Monjee Institute of Management Studies (NMIMS), Mumbai",
+                "497|Christ (Deemed to be University), Bengaluru",
+                "498|Jain (Deemed-to-be University), Bengaluru",
+                "499|PES University, Bengaluru",
+                "500|RV University, Bengaluru",
+                "501|M. S. Ramaiah University of Applied Sciences, Bengaluru",
+                "502|Dayananda Sagar University, Bengaluru",
+                "503|REVA University, Bengaluru",
+                "504|BMS College of Engineering (Autonomous), Bengaluru",
+                "505|Shiv Nadar University, Greater Noida",
+                "506|Ashoka University, Sonipat",
+                "507|O. P. Jindal Global University, Sonipat",
+                "508|ICFAI Foundation for Higher Education, Hyderabad",
+                "509|GITAM (Deemed to be University), Visakhapatnam",
+                "510|Amity University, Noida",
+                "511|Chandigarh University, Mohali",
+                "512|Lovely Professional University (LPU), Punjab",
+                "513|UPES (University of Petroleum and Energy Studies), Dehradun",
+                "514|The Institute of Chartered Accountants of India (ICAI)",
+                "515|The Institute of Cost Accountants of India (ICMAI)",
+                "516|The Institute of Company Secretaries of India (ICSI)",
+                "517|National Board of Examinations in Medical Sciences (NBEMS / DNB)",
+                "518|Bar Council of India (BCI)",
+                "521|National Institute of Open Schooling (NIOS)",
+                "522|Karnataka School Examination and Assessment Board (KSEAB / KSEEB)",
+                "524|Board of Intermediate Education, Andhra Pradesh (BIEAP)",
+                "525|Board of Secondary Education, Andhra Pradesh (BSEAP)",
+                "526|Telangana State Board of Intermediate Education (TSBIE)",
+                "527|Telangana State Board of Secondary Education (BSETS)",
+                "528|Tamil Nadu State Board of School Examinations",
+                "530|Uttar Pradesh Madhyamik Shiksha Parishad (UPMSP)",
+                "533|Kerala Board of Public Examinations (KBPE / DHSE Kerala)",
+                "535|Rajasthan Board of Secondary Education (RBSE / BSER), Ajmer",
+                "536|Madhya Pradesh Board of Secondary Education (MPBSE), Bhopal",
+                "537|Gujarat Secondary and Higher Secondary Education Board (GSHSEB)",
+                "538|Punjab School Education Board (PSEB), Mohali",
+                "539|Haryana Board of School Education (HBSE / BSEH), Bhiwani",
+                "542|State Board of Technical Education and Training (SBTET), Andhra Pradesh",
+                "543|State Board of Technical Education and Training (SBTET), Telangana",
+                "545|Department of Technical Education (DTE), Karnataka",
+                "546|Maharashtra State Board of Technical Education (MSBTE), Mumbai",
+                "547|Board of Technical Education (BTE), Uttar Pradesh",
+                "548|Board of Technical Education (BTE), Delhi",
                 "549|Mangalore Institute of Technology and Engineering (MITE), Moodabidri",
-                "550|Other Recognized University / Board"
+                "550|Other Recognized University / Board",
             };
 
             foreach (var u in univs)
             {
                 var p = u.Split('|');
-                using (OracleCommand cmd = new OracleCommand("INSERT INTO EDU_UNIVERSITY (UNIV_ID, UNIV_NAME, IS_ACTIVE) VALUES (:ID, :NAME, 1)", conn))
+                using (OracleCommand cmd = new OracleCommand(@"
+                    MERGE INTO EDU_UNIVERSITY dest
+                    USING (SELECT :ID AS ID, :NAME AS NAME FROM DUAL) src
+                    ON (dest.UNIV_ID = src.ID)
+                    WHEN NOT MATCHED THEN INSERT (UNIV_ID, UNIV_NAME, IS_ACTIVE) VALUES (src.ID, src.NAME, 1)", conn))
                 {
                     cmd.Parameters.Add(new OracleParameter("ID", Convert.ToInt32(p[0])));
                     cmd.Parameters.Add(new OracleParameter("NAME", p[1]));
@@ -920,8 +1666,11 @@ namespace EducationApp.Utils
         {
             string[] subs = new string[]
             {
+                "0|*|*",
                 "1|Manufacturing Technology|Mechanical",
                 "2|Microwave and Radar Electronics|Electronics",
+                "3|Antennas|Electronics",
+                "4|Structures|Civil Engg",
                 "5|Information Technology|Computer Science",
                 "6|Computer Science|Computer Science",
                 "7|Electronics and Communications|Electronics",
@@ -932,20 +1681,111 @@ namespace EducationApp.Utils
                 "12|Physics|Physics",
                 "13|Chemistry|Chemistry",
                 "14|Mathematics|Mathematics",
+                "15|Information Science|Computer Science",
+                "16|Chemical Engineering|Chemical",
+                "17|Computer Engineering|Computer Science",
+                "18|Instrumentation Technology|Electronics",
                 "19|Computer Applications|Computer Science",
                 "20|Commerce|Commerce",
+                "21|Arts|Arts",
                 "22|Management|Management",
+                "23|English|Languages",
+                "24|Electronics|Electronics",
+                "25|Engineering Design|Mechanical",
+                "26|Communication Systems|Electronics",
+                "27|Electronics and Instrumentation|Electronics",
+                "28|Power Electronics|Electrical",
+                "29|Electronics and Telecommunication|Electronics",
+                "30|Radar Systems|Radar",
+                "31|Electrical Engineering|Electrical",
+                "32|Applied Physics|Physics",
+                "33|Microwave Engineering|Electronics",
+                "34|Modelling and Simulation|Physics",
+                "35|Advanced Electronics|Electronics",
+                "36|Computer Technology|Computer Science",
+                "37|Heat Power|Heat Power",
+                "38|Thermal Engineering|Mechanical",
+                "39|Laser and ElectroOptics|Electronics",
+                "40|Engineering Systems|Computer Science",
+                "41|Signal Processing|Electronics",
+                "42|Finance|Management",
+                "43|Solid State Technology|Physics",
+                "44|Spherical Vector Wave Function|*",
+                "45|VLSI Design|Electronics",
+                "46|Library Science|*",
+                "47|Control and Instrumentation|Electrical",
+                "48|Radar and Communcation|Radar",
+                "49|Process Engineering|*",
+                "50|Machine Design|Mechanical",
                 "51|Software Systems|Computer Science",
-                "92|Science|Science",
-                "93|General|General",
-                "94|Mathematics & Science|General",
-                "99|Other|General"
+                "52|System Science and Automation|Computer Science",
+                "53|Aerospace Engineering|Aerospace",
+                "54|Industrial Electronics|Electronics",
+                "55|Communication Engineering|Electronics",
+                "56|Electronic Design|Electronics",
+                "57|Production Engineering|Mechanical",
+                "58|Sound and TV|Electronics",
+                "59|Automobile Engineering|Mechanical",
+                "60|Computer Communication|Computer Science",
+                "61|Optical Communication|Electronics",
+                "62|Craftsman|Craftsman",
+                "63|Electricals|Electrical",
+                "64|Radio Mechanics|Electronics",
+                "65|Public Relations|Administratiorn",
+                "66|Buisiness Administration|Administration",
+                "67|Business Management|Management",
+                "68|Law|Law",
+                "69|ElectroPlating|Chemical",
+                "70|Power Systems|Electrical",
+                "71|Reliability Engineering|Electronics",
+                "72|Marketing|Management",
+                "73|Digital Systems|Electronics",
+                "74|OPTOELECTRONICS|OPTOELECTRONICS",
+                "75|Hindi|Arts",
+                "76|Digital Electronics and Advanced Communications|Electronics",
+                "77|Computer and Information Science|Computer",
+                "78|Microwave Signals and Systems|Electronics",
+                "79|Material science|Mechanical",
+                "80|Human Resource Management|HRM",
+                "81|POLITICAL SCIENCE|GENERAL",
+                "82|ECONOMICS|GENERAL",
+                "83|RADIO AND TRANSISTOR|ELECTRONICS",
+                "84|Secratarial Practice|PA",
+                "85|Printing Technology|Printing",
+                "86|Communication Control and Networking|Computer Science",
+                "87|Zoology|Biological Sciences",
+                "88|Sociology|Arts",
+                "89|High Voltage Engineering|Electronics",
+                "90|Computer Science and Engineering|Computer Science",
+                "91|DLLELW|Miscellaneous",
+                "92|science|science",
+                "93|General|general",
+                "94|Maths|Maths",
+                "95|Control System Engineering|Electrical",
+                "96|RF and Microwave|Electronics and Electrical Communication Engineering",
+                "97|INSTRUMENTATION AND CONTROL ENGINEERING|INSTRUMENTATION",
+                "98|Radio Frequency Design and Technology|Electronics",
+                "99|MS|MASTER OF SCIENCE",
+                "100|MS|MS",
+                "101|MICROELECTRONICS|MICROELECTRONICS",
+                "102|PCMB|INTERMEDIATE",
+                "103|MS|ENGINEERING",
+                "104|M.S.|M.S.",
+                "105|PCM|PCM",
+                "106|MASTER OF SCINECE|MASTER OF SCIENCE",
+                "107|Computer and Information Science|Computer Science",
+                "108|MACHINIST|MECHANICAL",
+                "109|INSTRUMENTATION ENGINEERING|INSTRUMENTATION",
             };
 
             foreach (var s in subs)
             {
                 var p = s.Split('|');
-                using (OracleCommand cmd = new OracleCommand("INSERT INTO EDU_SUBJECT (SUBJECT_ID, SUBJECT_NAME, SUBJECT_GROUP, IS_ACTIVE) VALUES (:ID, :NAME, :GRP, 1)", conn))
+                using (OracleCommand cmd = new OracleCommand(@"
+                    MERGE INTO EDU_SUBJECT dest
+                    USING (SELECT :ID AS ID, :NAME AS NAME, :GRP AS GRP FROM DUAL) src
+                    ON (dest.SUBJECT_ID = src.ID)
+                    WHEN NOT MATCHED THEN INSERT (SUBJECT_ID, SUBJECT_NAME, SUBJECT_GROUP, IS_ACTIVE) VALUES (src.ID, src.NAME, src.GRP, 1)", conn))
                 {
                     cmd.Parameters.Add(new OracleParameter("ID", Convert.ToInt32(p[0])));
                     cmd.Parameters.Add(new OracleParameter("NAME", p[1]));
@@ -1102,58 +1942,120 @@ namespace EducationApp.Utils
 
         private static void SeedQualificationMappings(OracleConnection conn)
         {
-            // Core mapping from legacy App 2 QFNID to new Qualification code
-            Tuple<int, string, string, string, string, string>[] maps = new Tuple<int, string, string, string, string, string>[]
+            string[] maps = new string[]
             {
-                Tuple.Create(1, "B.Sc", "B.Sc", "BSC", "GENSC", "Bachelor of Science"),
-                Tuple.Create(2, "BE", "BE", "BE", "GENENG", "Bachelor of Engineering"),
-                Tuple.Create(3, "ME", "ME", "ME", "GENENG", "Master of Engineering"),
-                Tuple.Create(4, "M.Sc", "M.Sc", "MSC", "GENSC", "Master of Science"),
-                Tuple.Create(5, "AMIETE", "BE", "AMIE", "GENENG", "AMIETE to AMIE"),
-                Tuple.Create(6, "B.Tech", "BE", "BTECH", "GENENG", "Bachelor of Technology"),
-                Tuple.Create(7, "M.Tech", "ME", "MTECH", "GENENG", "Master of Technology"),
-                Tuple.Create(8, "AMIE", "BE", "AMIE", "GENENG", "AMIE/IETE"),
-                Tuple.Create(9, "MCA", "MCA", "MCA", "COMPS", "Master of Computer Applications"),
-                Tuple.Create(10, "MBA", "MBA", "MBA", "MANG", "Master of Business Administration"),
-                Tuple.Create(11, "Ph.D", "Ph.D", "PHD", "RESEARCH", "Doctorate in Philosophy"),
-                Tuple.Create(12, "M.Phil", "M.Phil", "MPHIL", "RESEARCH", "Master of Philosophy"),
-                Tuple.Create(13, "Diploma", "DIP", "DIPL", "GENERAL", "Diploma"),
-                Tuple.Create(14, "M.Li.Sc", "M.Li.Sc", "MLIS", "BLIB", "Library Science"),
-                Tuple.Create(15, "B.Com", "B.Com", "BCOM", "COM", "Bachelor of Commerce"),
-                Tuple.Create(16, "BA", "BA", "BA", "ARTS", "Bachelor of Arts"),
-                Tuple.Create(17, "MA", "MA", "MA", "ARTS", "Master of Arts"),
-                Tuple.Create(18, "M.Com", "M.Com", "MCOM", "COM", "Master of Commerce"),
-                Tuple.Create(19, "SSLC/X Class", "SSLC", "MTRI", "GENERAL", "SSLC mapped to 10th"),
-                Tuple.Create(20, "PUC/XII", "PUC/XII", "PUC", "PCMB", "PUC mapped to Pre University Course"),
-                Tuple.Create(21, "B.Sc. (Engg.)", "B.Sc. (Engg.)", "BSCEN", "GENENG", "B.Sc. Engineering"),
-                Tuple.Create(26, "DEE", "Diploma", "DENG", "ELCL", "Diploma in Electrical Engg"),
-                Tuple.Create(37, "DME", "Diploma", "DENG", "DMECH", "Diploma in Mechanical Engg"),
-                Tuple.Create(41, "I.T.I", "ITI", "ITI", "FIT", "ITI Trade"),
-                Tuple.Create(45, "MBBS", "Medicine", "MBBS", "MED", "MBBS"),
-                Tuple.Create(48, "DCE", "DCE", "DENG", "CIVIL", "Diploma in Civil Engg"),
-                Tuple.Create(50, "LLB", "LAW", "LLB", "LAW", "Bachelor of Laws"),
-                Tuple.Create(54, "FITTER", "ITI", "ITI", "FIT", "Fitter ITI"),
-                Tuple.Create(55, "BBA", "BBA", "BBA", "MANG", "BBA"),
-                Tuple.Create(59, "BBM", "BBM", "BBM", "MANG", "BBM"),
-                Tuple.Create(65, "BCA", "BCA", "BCA", "COMPS", "BCA"),
-                Tuple.Create(68, "SSC", "SSC", "MTRI", "GENERAL", "SSC (10th)"),
-                Tuple.Create(70, "AISSCE", "AISSCE", "SCI", "PCMB", "AISSCE (12th)"),
-                Tuple.Create(80, "Below SSLC", "Below SSLC", "BMTRI", "GENERAL", "Below SSLC")
+                "0|*|*|OTHER|GENERAL|Not specified / Asterisk",
+                "1|B.Sc|B.Sc|BSC|GENSC|Bachelor of Science",
+                "2|BE|BE|BE|GENENG|Bachelor of Engineering",
+                "3|ME|ME|ME|GENENG|Master of Engineering",
+                "4|M.Sc|M.Sc|MSC|GENSC|Master of Science",
+                "5|AMIETE|BE|AMIE|GENENG|AMIETE to AMIE/IETE",
+                "6|B.Tech|BE|BTECH|GENENG|Bachelor of Technology",
+                "7|M.Tech|ME|MTECH|GENENG|Master of Technology",
+                "8|AMIE|BE|AMIE|GENENG|AMIE/IETE",
+                "9|MCA|MCA|MCA|CA|Master of Computer Applications",
+                "10|MBA|MBA|MBA|MANG|Master of Business Administration",
+                "11|Ph.D|Ph.D|PHD|RESEARCH|Doctorate in Philosophy",
+                "12|M.Phil|M.Phil|MPHIL|RESEARCH|Master of Philosophy",
+                "13|Diploma|DIP|DIPL|GENERAL|Diploma",
+                "14|M.Li.Sc|M.Li.Sc|MLIS|BLIB|Master of Library and Info Science",
+                "15|B.Com|B.Com|BCOM|COM|Bachelor of Commerce",
+                "16|BA|BA|BA|ARTS|Bachelor of Arts",
+                "17|MA|MA|MA|ARTS|Master of Arts",
+                "18|M.Com|M.Com|MCOM|COM|Master of Commerce",
+                "19|SSLC/X Class|SSLC|MTRI|GENERAL|SSLC / X Class mapped to 10th",
+                "20|PUC/XII|PUC/XII|PUC|GENSC|PUC / XII mapped to Pre University Course",
+                "21|B.Sc. (Engg.)|B.Sc. (Engg.)|BSCEN|GENENG|Bachelor of Science (Engg.)",
+                "22|DMIT|DIP|DIPL|GENERAL|DMIT mapped to Diploma",
+                "23|DIIT|*|DIPL|GENERAL|DIIT mapped to Diploma",
+                "24|Post Diploma|Post Diploma Course|PGD|GENERAL|Post Diploma",
+                "25|DRE|DRE|DENG|RACE|DRE - Diploma in Radar / Radio Engg",
+                "26|DEE|Diploma|DENG|ELCL|DEE - Diploma in Electrical Engg",
+                "27|MIETE|ME|ME|GENENG|MIETE mapped to Master of Engineering",
+                "28|M.Sc.(Engg)|M.Tech|MSENG|GENENG|M.Sc.(Engg)",
+                "29|PGDIM|PGDIM|PGD|MANG|PGDIM - Post Graduate Diploma in Management",
+                "30|DIM|Diploma in Management|DBA|MANG|DIM - Diploma in Management",
+                "31|ADM|MANAGEMENT|DBA|MANG|ADM - Advanced Diploma in Management",
+                "32|SDM|MANAGEMENT|DBA|MANG|SDM - Senior Diploma in Management",
+                "33|DLE (Hons)|Diploma|DENG|ELCL|DLE - Diploma in Electrical/Electronics",
+                "34|Grad. IETE|*|AMIE|GENENG|Grad. IETE mapped to AMIE",
+                "35|B.Ed.|*|B Ed|EDUCATION|Bachelor of Education",
+                "36|DTE|Diploma|DENG|GENENG|DTE - Diploma in Technical Education",
+                "37|DME|Diploma|DENG|DMECH|DME - Diploma in Mechanical Engineering",
+                "38|A.D.I.M|Management|DBA|MANG|A.D.I.M - Advanced Diploma in Management",
+                "39|D.H.R.M|Management|DBA|HR|D.H.R.M - Diploma in Human Resource Management",
+                "40|BTE|BTE|DENG|GENENG|BTE - Board of Technical Education",
+                "41|I.T.I|ITI|ITI|VOCATIONAL|I.T.I",
+                "42|NAC|NAC|NAC|APPR|NAC - National Apprenticeship Certificate",
+                "43|Stenography|Stenography|CC|STENO|Stenography Certificate Course",
+                "44|NTC|NTC|NTC|VOCATIONAL|NTC - National Trade Certificate",
+                "45|MBBS|Medicine|MBBS|MED|Bachelor of Medicine and Bachelor of Surgery",
+                "46|B.Sc. PAR I|B.Sc.|BSC|GENSC|B.Sc. Part I",
+                "47|PG|*|PG|GENERAL|Post Graduate (General)",
+                "48|DCE|DCE|DENG|CIVIL|DCE - Diploma in Civil Engineering",
+                "49|B.Li.Sc|B.Li.Sc|BLISC|BLIB|Bachelor of Library and Info Science",
+                "50|LLB|LAW|LLB|LAW|Bachelor of Laws",
+                "51|ATC|ATC|CC|VOCATIONAL|ATC - Advanced Training Course",
+                "52|RVTI(w)|RVTI(w)|ITI|VOCATIONAL|RVTI(w) - Vocational Training",
+                "53|HMT|HMT|CC|VOCATIONAL|HMT Training Course",
+                "54|FITTER|ITI|ITI|FIT|Fitter ITI Trade",
+                "55|BBA|BBA|BBA|MANG|Bachelor of Business Administration",
+                "56|'A' Level|DOEACC|PGD|COMPS|DOEACC 'A' Level (PG Diploma equivalent)",
+                "57|'O' Level|DOEACC|DIPL|COMPS|DOEACC 'O' Level (Diploma equivalent)",
+                "58|PGDHRM|PGD|PGD|HR|PGDHRM - PG Diploma in HR Management",
+                "59|BBM|BBM|BBM|MANG|Bachelor of Business Management",
+                "60|PGDMM|PGD|PGD|MARKT|PGDMM - PG Diploma in Marketing",
+                "61|ADST|Diploma|DIPL|GENSC|ADST - Advanced Diploma in Science/Tech",
+                "62|BL|Law|LLB|LAW|BL - Bachelor of Law",
+                "63|MSW|MSW|MSW|SS|Master of Social Work",
+                "64|HDMM|MANAGEMENT|DBA|MARKT|HDMM - Higher Diploma in Marketing",
+                "65|BCA|BCA|BCA|COMPS|Bachelor of Computer Applications",
+                "66|NCVT|NCVT|ITI|VOCATIONAL|NCVT - National Council for Vocational Training",
+                "67|M S E E|Masters|ME|GENENG|M S E E - Master of Science in Electrical Engg",
+                "68|SSC|SSC|MTRI|GENERAL|SSC - Secondary School Certificate (10th)",
+                "69|AISSE|AISSE|MTRI|GENERAL|AISSE - All India Secondary School Exam (10th)",
+                "70|AISSCE|AISSCE|SCI|GENSC|AISSCE - All India Sr School Certificate (12th)",
+                "71|D.E.C.E|DECE|DENG|EC|D.E.C.E - Diploma in Electronics and Comm",
+                "72|PGD (VLSI)|PGD|PGD|ELECT|PGD (VLSI)",
+                "73|THSLC|THSLC|MTRI|GENERAL|THSLC - Technical High School Leaving Cert (10th)",
+                "74|VHSC|VHSC|SCI|GENSC|VHSC - Vocational Higher Secondary (12th)",
+                "75|PGDCS|PGDCS|PGD|COMPS|PGDCS - PG Diploma in Computer Science",
+                "76|GRDUATION|GRDUATION|GDT|GENERAL|Graduation (General)",
+                "77|PGDFM|PGDFM|PGD|FINAN|PGDFM - PG Diploma in Financial Management",
+                "78|Dual Degree|BE|BE|GENENG|Dual Degree (BE/BTech)",
+                "79|PG Dip and IR|Diploma|PGD|HR|PG Dip in Industrial Relations",
+                "80|Below SSLC|Below SSLC|BMTRI|GENERAL|Below SSLC (Less than 10th)",
+                "81|MS|MS|MSENG|GENENG|Master of Science (Engineering)",
+                "82|BLI Sc|BLI Sc|BLISC|BLIB|Bachelor of Library Science",
+                "83|MLI Sc|MLI Sc|MLIS|BLIB|Master of Library Science",
+                "84|LLM|Law|LLM|LAW|Master of Laws",
+                "85|VHSE|VHSE|SCI|GENSC|VHSE - Vocational Higher Secondary Exam (12th)",
+                "86|PG DIIT|*|PGD|GENENG|PG DIIT - Post Graduate DIIT",
+                "87|GMP|*|PGD|MANG|GMP - General Management Programme",
+                "88|PGDPM|PGDPM|PGD|HR|PGDPM - PG Diploma in Personnel Management",
+                "89|DMM|DMM|DIPL|MARKT|DMM - Diploma in Marketing Management",
+                "90|PGDMM|PGDMM|PGD|MARKT|PGDMM - PG Diploma in Materials/Marketing",
+                "91|DIT|DIT|DIPL|IT|DIT - Diploma in Information Technology",
+                "92|DIV|DIV|DIPL|GENERAL|DIV - Diploma in Vocational",
+                "93|PGDBA|PGDBA|PGD|MANG|PGDBA - PG Diploma in Business Administration",
             };
 
             foreach (var m in maps)
             {
+                var parts = m.Split('|');
                 using (OracleCommand cmd = new OracleCommand(@"
-                    INSERT INTO EDU_QUAL_MAPPING 
-                    (OLD_QFN_ID, OLD_QFN_NAME, OLD_QFN_GROUP, NEW_QUAL_MAIN_CODE, NEW_QUAL_SUB_CODE, NOTES, IS_ACTIVE)
+                    MERGE INTO EDU_QUAL_MAPPING dest
+                    USING (SELECT :OID AS OID FROM DUAL) src
+                    ON (dest.OLD_QFN_ID = src.OID)
+                    WHEN NOT MATCHED THEN INSERT (OLD_QFN_ID, OLD_QFN_NAME, OLD_QFN_GROUP, NEW_QUAL_MAIN_CODE, NEW_QUAL_SUB_CODE, NOTES, IS_ACTIVE)
                     VALUES (:OID, :ONAME, :OGRP, :NMC, :NSC, :NOTES, 1)", conn))
                 {
-                    cmd.Parameters.Add(new OracleParameter("OID", m.Item1));
-                    cmd.Parameters.Add(new OracleParameter("ONAME", m.Item2));
-                    cmd.Parameters.Add(new OracleParameter("OGRP", m.Item3));
-                    cmd.Parameters.Add(new OracleParameter("NMC", m.Item4));
-                    cmd.Parameters.Add(new OracleParameter("NSC", m.Item5));
-                    cmd.Parameters.Add(new OracleParameter("NOTES", m.Item6));
+                    cmd.Parameters.Add(new OracleParameter("OID", Convert.ToInt32(parts[0])));
+                    cmd.Parameters.Add(new OracleParameter("ONAME", parts[1]));
+                    cmd.Parameters.Add(new OracleParameter("OGRP", parts[2]));
+                    cmd.Parameters.Add(new OracleParameter("NMC", parts[3]));
+                    cmd.Parameters.Add(new OracleParameter("NSC", parts[4]));
+                    cmd.Parameters.Add(new OracleParameter("NOTES", parts[5]));
                     cmd.ExecuteNonQuery();
                 }
             }
@@ -1327,14 +2229,22 @@ namespace EducationApp.Utils
         public static DataTable GetEmployeeEducations(string pcno)
         {
             string query = @"
-                SELECT EDU_ID, PCNO, EMP_NAME, DESIGNATION, DIVISION_NAME,
-                       QUAL_MAIN_CODE, QUAL_MAIN_NAME, QUAL_SUB_CODE, QUAL_SUB_NAME,
-                       YEAR_PASSED, INSTITUTE_NAME, COLLEGE_NAME, SPECIALIZATION,
-                       CGPA_MARKS, GRADE_DIVISION, IS_HIGHEST, REMARKS, STATUS,
-                       SUBMITTED_DATE, CREATED_ON, IS_MIGRATED
-                FROM EDU_EMP_EDUCATION
-                WHERE PCNO = :PCNO
-                ORDER BY IS_HIGHEST DESC, YEAR_PASSED DESC, EDU_ID DESC";
+                SELECT e.EDU_ID, e.PCNO, e.EMP_NAME, e.DESIGNATION, e.DIVISION_NAME,
+                       e.QUAL_MAIN_CODE, e.QUAL_MAIN_NAME, e.QUAL_SUB_CODE,
+                       COALESCE(
+                           (SELECT qs.SUB_NAME FROM EDU_QUAL_SUB qs 
+                            WHERE qs.SUB_CODE = e.QUAL_SUB_CODE 
+                              AND (qs.MAIN_QUAL_CODE = e.QUAL_MAIN_CODE OR qs.MAIN_QUAL_CODE IS NULL)
+                              AND ROWNUM = 1),
+                           e.QUAL_SUB_NAME,
+                           e.QUAL_SUB_CODE
+                       ) AS QUAL_SUB_NAME,
+                       e.YEAR_PASSED, e.INSTITUTE_NAME, e.COLLEGE_NAME, e.SPECIALIZATION,
+                       e.CGPA_MARKS, e.GRADE_DIVISION, e.IS_HIGHEST, e.REMARKS, e.STATUS,
+                       e.SUBMITTED_DATE, e.CREATED_ON, e.IS_MIGRATED
+                FROM EDU_EMP_EDUCATION e
+                WHERE e.PCNO = :PCNO
+                ORDER BY e.IS_HIGHEST DESC, e.YEAR_PASSED DESC, e.EDU_ID DESC";
 
             return ExecuteQuery(query, new OracleParameter("PCNO", pcno.Trim()));
         }
@@ -1402,11 +2312,12 @@ namespace EducationApp.Utils
                 if (IsPlaceholderOrInvalid(subQualCode)) throw new ArgumentException("Sub Qualification / Stream cannot be empty or placeholder ('*').");
                 if (yearPassed < 1950 || yearPassed > DateTime.Now.Year) throw new ArgumentException("Passing Year is invalid.");
                 if (IsPlaceholderOrInvalid(instituteName)) throw new ArgumentException("University / Board cannot be empty or placeholder ('*').");
-                if (IsPlaceholderOrInvalid(collegeName)) throw new ArgumentException("College / School Name cannot be empty or placeholder ('*').");
-                if (IsPlaceholderOrInvalid(gradeDivision)) throw new ArgumentException("Grade / Division cannot be empty or placeholder ('*').");
+                if (IsPlaceholderOrInvalid(gradeDivision) || !IsValidGrade(gradeDivision)) throw new ArgumentException("Grade / Division cannot be empty or invalid. A valid Grade must be selected.");
                 if (IsInvalidSpecialization(specialization)) throw new ArgumentException("Specialization cannot be empty or placeholder ('*'). ('N/A' is allowed).");
                 if (IsPlaceholderOrInvalid(cgpaMarks)) throw new ArgumentException("Score (Percentage / CGPA / Marks) cannot be empty or placeholder ('*').");
             }
+
+            gradeDivision = NormalizeGrade(gradeDivision);
 
             if (eduId > 0)
             {
@@ -1561,6 +2472,73 @@ namespace EducationApp.Utils
         }
 
         /// <summary>
+        /// Normalizes raw or legacy grade strings into the canonical, standardized Grade/Division names
+        /// used in the application dropdowns (e.g. 'First Class with Distinction', 'First Class', 'Second Class', 'Pass Class', etc.).
+        /// Returns empty string if missing, placeholder, or invalid.
+        /// </summary>
+        public static string NormalizeGrade(string rawGrade)
+        {
+            if (string.IsNullOrWhiteSpace(rawGrade) || IsPlaceholderOrInvalid(rawGrade))
+                return "";
+
+            string g = rawGrade.Trim().ToUpperInvariant();
+
+            if (g.Contains("DISTINCTION") || g == "FCD" || g == "FIRST CLASS WITH DISTINCTION")
+                return "First Class with Distinction";
+            if (g.Contains("FIRST") || g == "1ST CLASS" || g == "1ST" || g == "FC" || g == "I CLASS" || g == "CLASS I")
+                return "First Class";
+            if (g.Contains("SECOND") || g == "2ND CLASS" || g == "2ND" || g == "SC" || g == "II CLASS" || g == "CLASS II")
+                return "Second Class";
+            if (g.Contains("PASS") || g == "PASSED" || g == "PC" || g.Contains("THIRD") || g == "3RD CLASS" || g == "3RD")
+                return "Pass Class";
+            if (g == "GRADE A+" || g == "A+")
+                return "Grade A+";
+            if (g == "GRADE A" || g == "A")
+                return "Grade A";
+            if (g == "GRADE B+" || g == "B+")
+                return "Grade B+";
+            if (g == "GRADE B" || g == "B")
+                return "Grade B";
+            if (g.Contains("EXEMPLARY"))
+                return "Exemplary";
+
+            return "";
+        }
+
+        /// <summary>
+        /// Validates whether a Grade / Division string is one of the recognized, valid grades.
+        /// </summary>
+        public static bool IsValidGrade(string grade)
+        {
+            string norm = NormalizeGrade(grade);
+            return !string.IsNullOrEmpty(norm);
+        }
+
+        /// <summary>
+        /// Checks whether a given qualification is a Certificate, Apprenticeship, or Vocational training qualification
+        /// which is typically issued by a certifying council/authority rather than an academic university.
+        /// </summary>
+        public static bool IsCertificateQualification(string qualCode, string qualName = "")
+        {
+            if (string.IsNullOrWhiteSpace(qualCode) && string.IsNullOrWhiteSpace(qualName))
+                return false;
+
+            string c = (qualCode ?? "").Trim().ToUpper();
+            string n = (qualName ?? "").Trim().ToUpper();
+
+            string[] certCodes = new string[] { "CC", "NAC", "NTC", "NCVT", "ITI", "ATC", "CERT" };
+            if (Array.IndexOf(certCodes, c) >= 0) return true;
+
+            if (n.Contains("CERTIFICATE") || n.Contains("APPRENTICE") || n.Contains("VOCATIONAL") || 
+                n.Contains("TRADE") || n.Contains("TRAINING") || n.Contains("ITI") || n.Contains("NAC"))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// Validates all draft records for an employee to ensure none contain placeholder values (like '*')
         /// or unselected required fields before official submission.
         /// Returns a list of detailed human-readable validation error messages.
@@ -1617,13 +2595,21 @@ namespace EducationApp.Utils
                 {
                     missingFields.Add("Passing Year (must be between 1950 and " + currentYear + ")");
                 }
+                bool isCert = IsCertificateQualification(mainCode, mainName);
                 if (IsPlaceholderOrInvalid(inst))
                 {
-                    missingFields.Add("University / Board / Institute");
+                    missingFields.Add(isCert ? "Certifying Body / Issuing Authority" : "University / Board / Institute");
                 }
                 if (IsPlaceholderOrInvalid(college))
                 {
-                    missingFields.Add("College / School Name");
+                    if (isCert)
+                    {
+                        college = "Direct Certification / Same as Issuing Authority";
+                    }
+                    else
+                    {
+                        missingFields.Add("College / School Name");
+                    }
                 }
                 if (IsInvalidSpecialization(spec))
                 {
@@ -1633,9 +2619,9 @@ namespace EducationApp.Utils
                 {
                     missingFields.Add("Score (Percentage / CGPA / Marks)");
                 }
-                if (IsPlaceholderOrInvalid(grade))
+                if (IsPlaceholderOrInvalid(grade) || !IsValidGrade(grade))
                 {
-                    missingFields.Add("Grade / Division");
+                    missingFields.Add("Grade / Division (must select a valid grade from the list)");
                 }
 
                 if (missingFields.Count > 0)
@@ -1772,15 +2758,23 @@ namespace EducationApp.Utils
 
         #region Admin Overview & Master Data
 
-        public static DataTable GetAdminEducationOverview(string search, string statusFilter, string qualFilter, string divisionFilter)
+        public static DataTable GetAdminEducationOverview(string search, string statusFilter, string qualFilter, string divisionFilter, string highestFilter = "ALL")
         {
             string query = @"
-                SELECT EDU_ID, PCNO, EMP_NAME, DESIGNATION, DIVISION_NAME,
-                       QUAL_MAIN_CODE, QUAL_MAIN_NAME, QUAL_SUB_CODE, QUAL_SUB_NAME,
-                       YEAR_PASSED, INSTITUTE_NAME, COLLEGE_NAME, SPECIALIZATION,
-                       CGPA_MARKS, GRADE_DIVISION, IS_HIGHEST, REMARKS, STATUS,
-                       SUBMITTED_DATE, CREATED_ON, IS_MIGRATED
-                FROM EDU_EMP_EDUCATION
+                SELECT e.EDU_ID, e.PCNO, e.EMP_NAME, e.DESIGNATION, e.DIVISION_NAME,
+                       e.QUAL_MAIN_CODE, e.QUAL_MAIN_NAME, e.QUAL_SUB_CODE,
+                       COALESCE(
+                           (SELECT qs.SUB_NAME FROM EDU_QUAL_SUB qs 
+                            WHERE qs.SUB_CODE = e.QUAL_SUB_CODE 
+                              AND (qs.MAIN_QUAL_CODE = e.QUAL_MAIN_CODE OR qs.MAIN_QUAL_CODE IS NULL)
+                              AND ROWNUM = 1),
+                           e.QUAL_SUB_NAME,
+                           e.QUAL_SUB_CODE
+                       ) AS QUAL_SUB_NAME,
+                       e.YEAR_PASSED, e.INSTITUTE_NAME, e.COLLEGE_NAME, e.SPECIALIZATION,
+                       e.CGPA_MARKS, e.GRADE_DIVISION, e.IS_HIGHEST, e.REMARKS, e.STATUS,
+                       e.SUBMITTED_DATE, e.CREATED_ON, e.IS_MIGRATED
+                FROM EDU_EMP_EDUCATION e
                 WHERE 1 = 1";
 
             List<OracleParameter> parameters = new List<OracleParameter>();
@@ -1807,6 +2801,18 @@ namespace EducationApp.Utils
             {
                 query += " AND UPPER(DIVISION_NAME) LIKE :DIV";
                 parameters.Add(new OracleParameter("DIV", "%" + divisionFilter.Trim().ToUpper() + "%"));
+            }
+
+            if (!string.IsNullOrEmpty(highestFilter) && highestFilter != "ALL")
+            {
+                if (highestFilter == "1" || highestFilter.Equals("YES", StringComparison.OrdinalIgnoreCase))
+                {
+                    query += " AND IS_HIGHEST = 1";
+                }
+                else if (highestFilter == "0" || highestFilter.Equals("NO", StringComparison.OrdinalIgnoreCase))
+                {
+                    query += " AND (IS_HIGHEST = 0 OR IS_HIGHEST IS NULL)";
+                }
             }
 
             query += " ORDER BY PCNO ASC, IS_HIGHEST DESC, YEAR_PASSED DESC";
@@ -1886,6 +2892,7 @@ namespace EducationApp.Utils
 
             DataTable dtSub = GetSubQualifications(null, true);
             var subList = new System.Collections.Generic.List<object>();
+            var seen = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (dtSub != null)
             {
                 foreach (DataRow r in dtSub.Rows)
@@ -1893,11 +2900,21 @@ namespace EducationApp.Utils
                     string subCode = r["SUB_CODE"].ToString().Trim();
                     string subName = r["SUB_NAME"].ToString().Trim();
                     string mainCode = r["MAIN_QUAL_CODE"] != DBNull.Value ? r["MAIN_QUAL_CODE"].ToString().Trim() : "";
+                    string key = mainCode + "|" + subCode;
+                    if (seen.Contains(key)) continue;
+                    seen.Add(key);
+
                     subList.Add(new { code = subCode, name = subName, main = mainCode });
                 }
             }
-            subList.Add(new { code = "GENERAL", name = "General", main = "" });
-            subList.Add(new { code = "OTHER", name = "Other (Specify in Specialization)", main = "" });
+            if (!seen.Contains("|GENERAL"))
+            {
+                subList.Add(new { code = "GENERAL", name = "General", main = "" });
+            }
+            if (!seen.Contains("|OTHER"))
+            {
+                subList.Add(new { code = "OTHER", name = "Other (Specify in Specialization)", main = "" });
+            }
 
             _cachedSubQualJson = new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(subList);
             return _cachedSubQualJson;
@@ -2172,6 +3189,445 @@ namespace EducationApp.Utils
             string sql = "DELETE FROM EDU_QUAL_SUB WHERE SUB_ID = :ID";
             return ExecuteNonQuery(sql,
                 new OracleParameter("ID", subId)) > 0;
+        }
+
+        
+        public static string EnsureUniversityExists(string name, string stateOrType = "Recognized Institution")
+        {
+            if (string.IsNullOrWhiteSpace(name) || IsPlaceholderOrInvalid(name))
+                return name;
+
+            string normalized = NormalizeUniversityName(name.Trim());
+
+            try
+            {
+                // Check if exists in EDU_UNIVERSITY (case-insensitive)
+                string checkSql = "SELECT UNIV_NAME FROM EDU_UNIVERSITY WHERE UPPER(TRIM(UNIV_NAME)) = :N AND ROWNUM = 1";
+                object res = ExecuteScalar(checkSql, new OracleParameter("N", normalized.ToUpper()));
+                if (res != null && res != DBNull.Value && !string.IsNullOrWhiteSpace(res.ToString()))
+                {
+                    return res.ToString();
+                }
+
+                // Insert into EDU_UNIVERSITY so it is permanently and globally available for all users
+                AddUniversity(normalized, stateOrType);
+                return normalized;
+            }
+            catch
+            {
+                return normalized;
+            }
+        }
+
+        public static string NormalizeUniversityName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return name;
+            string s = name.Trim();
+            string upper = s.ToUpper();
+
+            if (upper == "VTU" || upper.Contains("VISVESVARAYA TECHNOLOGICAL") || upper.Contains("VISWESWARAIAH"))
+                return "Visvesvaraya Technological University (VTU), Belagavi";
+            if (upper == "IISC" || upper == "IISC, BANGALORE" || upper == "IISC BANGALORE")
+                return "Indian Institute of Science (IISc), Bangalore";
+            if (upper == "JNTU" || (upper.StartsWith("JAWAHARLAL NEHRU TECHNOLOGICAL UNIVERSITY") && upper.Contains("HYDERABAD")))
+                return "Jawaharlal Nehru Technological University (JNTU), Hyderabad";
+            if (upper == "IGNOU" || (upper.Contains("IGNOU") && upper.Contains("DELHI")))
+                return "Indira Gandhi National Open University (IGNOU), New Delhi";
+            if (upper == "CBSE" || upper == "CBSE BOARD" || upper == "CBSE BOARD NEW DELHI" || upper == "CSBE")
+                return "Central Board of Secondary Education (CBSE), New Delhi";
+            if (upper == "ICSE" || upper == "ISC" || upper == "ICSE BOARD" || upper == "ISCE BOARD" || upper == "ICSE / ISC BOARD")
+                return "Council for the Indian School Certificate Examinations (CISCE / ICSE / ISC)";
+            if (upper == "PUE" || upper == "PRE UNIVERSITY BOARD")
+                return "Department of Pre-University Education (PUE), Karnataka";
+            if (upper == "REC, SURATKAL" || upper == "KREC SURATHKAL" || upper == "NIT, SURATHKAL" || upper == "NIT SURATHKAL")
+                return "National Institute of Technology Karnataka (NITK / REC), Surathkal";
+            if (upper == "REC, WARANGAL" || upper == "NIT, WARANGAL" || upper == "NIT WARANGAL")
+                return "National Institute of Technology (NIT / REC), Warangal";
+            if (upper == "REC, TIRUCHY" || upper == "NIT TRICHY" || upper == "NIT, TIRUCHIRAPPALLI")
+                return "National Institute of Technology (NIT / REC), Tiruchirappalli";
+            if (upper == "JNU,DELHI" || upper == "JNU")
+                return "Jawaharlal Nehru University (JNU), New Delhi";
+            if (upper == "ANNA UNIVERSITY")
+                return "Anna University, Chennai";
+            if (upper == "BANGALORE UNIVERSITY")
+                return "Bangalore University, Bengaluru";
+
+            return s;
+        }
+
+        private static Dictionary<int, string> _legacyUnivMap;
+        public static Dictionary<int, string> GetLegacyUniversityMap()
+        {
+            if (_legacyUnivMap == null)
+            {
+                var legacyMap = new Dictionary<int, string>();
+            legacyMap[0] = "Other Recognized University / Board";
+            legacyMap[1] = "Anna University, Chennai";
+            legacyMap[2] = "Bangalore University, Bengaluru";
+            legacyMap[3] = "Andhra University, Visakhapatnam";
+            legacyMap[4] = "Indian Institute of Technology (IIT), Kanpur";
+            legacyMap[5] = "Indian Institute of Technology (IIT), Madras";
+            legacyMap[6] = "Indian Institute of Technology (IIT), Delhi";
+            legacyMap[7] = "Indian Institute of Science (IISc), Bangalore";
+            legacyMap[8] = "Dr. A.P.J. Abdul Kalam Technical University (AKTU / UPTU), Lucknow";
+            legacyMap[9] = "Indian Institute of Technology (IIT), Guwahati";
+            legacyMap[10] = "Indian Institute of Technology (IIT), Roorkee";
+            legacyMap[11] = "Banaras Hindu University (BHU), Varanasi";
+            legacyMap[12] = "Birla Institute of Technology and Science (BITS), Pilani";
+            legacyMap[13] = "Indian Institute of Technology (IIT), Kharagpur";
+            legacyMap[14] = "National Institute of Technology (NIT / REC), Warangal";
+            legacyMap[15] = "National Institute of Technology (NIT / REC), Tiruchirappalli";
+            legacyMap[16] = "National Institute of Technology Karnataka (NITK / REC), Surathkal";
+            legacyMap[17] = "National Institute of Technology (NIT / REC), Calicut";
+            legacyMap[18] = "National Institute of Technology (NIT / REC), Silchar";
+            legacyMap[19] = "Malaviya National Institute of Technology (MNIT), Jaipur";
+            legacyMap[20] = "Karnatak University, Dharwad";
+            legacyMap[21] = "University of Mysore, Mysuru";
+            legacyMap[22] = "Mangalore University, Konaje";
+            legacyMap[23] = "Kuvempu University, Shankaraghatta, Shivamogga";
+            legacyMap[24] = "Annamalai University";
+            legacyMap[25] = "Jawaharlal Nehru Technological University Kakinada (JNTUK)";
+            legacyMap[26] = "Jawaharlal Nehru Technological University Anantapur (JNTUA)";
+            legacyMap[27] = "Acharya Nagarjuna University, Guntur";
+            legacyMap[28] = "Osmania University, Hyderabad";
+            legacyMap[29] = "Sri Venkateswara University";
+            legacyMap[30] = "University of Hyderabad (UoH / Central University), Hyderabad";
+            legacyMap[31] = "Bharathiar University";
+            legacyMap[32] = "Bharathidasan University";
+            legacyMap[33] = "University of Madras, Chennai";
+            legacyMap[34] = "Rajasthan University";
+            legacyMap[35] = "Kakatiya University";
+            legacyMap[36] = "Manonmani Sundaranathan University";
+            legacyMap[37] = "Sastra University";
+            legacyMap[38] = "Cochin University of Science and Technology (CUSAT), Kochi";
+            legacyMap[39] = "Vikram University, Ujjain";
+            legacyMap[40] = "Maulana Azad National Institute of Technology (MANIT), Bhopal";
+            legacyMap[41] = "Jainarayan Vayas University, Jodhpur";
+            legacyMap[42] = "Gulbarga University, Gulbarga";
+            legacyMap[43] = "Madurai Kamaraj University (MKU), Madurai";
+            legacyMap[44] = "Jawaharlal Nehru University (JNU), New Delhi";
+            legacyMap[45] = "University of Delhi (DU), New Delhi";
+            legacyMap[46] = "Pondicherry University";
+            legacyMap[47] = "U BTE Roorkee";
+            legacyMap[48] = "University of Kerala, Thiruvananthapuram";
+            legacyMap[49] = "National Institute of Technology (NIT / REC), Hamirpur";
+            legacyMap[50] = "Mahatma Gandhi University, Kerala";
+            legacyMap[51] = "Sardar Vallabhbhai National Institute of Technology (SVNIT), Surat";
+            legacyMap[52] = "Gurunanak Dev University, Punjab";
+            legacyMap[53] = "Madurai Kamaraj University (MKU), Madurai";
+            legacyMap[54] = "RD University";
+            legacyMap[55] = "Rajiv Gandhi Proudyogiki Vishwavidyalaya (RGPV), Bhopal";
+            legacyMap[56] = "Indian Institute of Technology (IIT), Bombay";
+            legacyMap[57] = "BIT Mesra Ranchi";
+            legacyMap[58] = "IAT,Pune";
+            legacyMap[59] = "Jawaharlal Nehru University (JNU), New Delhi";
+            legacyMap[60] = "Avadh University";
+            legacyMap[61] = "Utkal University, Bhubaneswar";
+            legacyMap[62] = "Mahatma Gandhi University, Kerala";
+            legacyMap[63] = "Geherwal University";
+            legacyMap[64] = "Allahabad University";
+            legacyMap[65] = "University of Calicut, Malappuram";
+            legacyMap[66] = "IETE, New Delhi";
+            legacyMap[67] = "Institution of Engineers, New Delhi";
+            legacyMap[68] = "Motilal Nehru National Institute of Technology (MNNIT), Allahabad";
+            legacyMap[69] = "MNB Garwal University";
+            legacyMap[70] = "MERRUT University";
+            legacyMap[71] = "Savitribai Phule Pune University (SPPU / University of Pune)";
+            legacyMap[72] = "University of Calicut, Malappuram";
+            legacyMap[73] = "University of Calcutta (Calcutta University), Kolkata";
+            legacyMap[74] = "Deen Dayal Upadhyaya Gorakhpur University (DDU), Gorakhpur";
+            legacyMap[75] = "National Institute of Technology Karnataka (NITK / REC), Surathkal";
+            legacyMap[76] = "Dr.H.S.Gaur University, Sagar";
+            legacyMap[77] = "Barkatulla University, Bhopal";
+            legacyMap[78] = "University of Lucknow, Lucknow";
+            legacyMap[79] = "Kumoan University, Nainital";
+            legacyMap[80] = "BITS Ranchi";
+            legacyMap[81] = "Bundel Khand University";
+            legacyMap[82] = "Dayalbagh University";
+            legacyMap[83] = "REC, Bhalki";
+            legacyMap[84] = "Aligarh Muslim University (AMU), Aligarh";
+            legacyMap[85] = "Ranchi University";
+            legacyMap[86] = "National Institute of Technology (NIT / REC), Rourkela";
+            legacyMap[87] = "Sambalpur University, Orissa";
+            legacyMap[88] = "AIMA,New Delhi";
+            legacyMap[89] = "Indira Gandhi National Open University (IGNOU), New Delhi";
+            legacyMap[90] = "MIT,Madras";
+            legacyMap[91] = "Deen Dayal Upadhyaya Gorakhpur University (DDU), Gorakhpur";
+            legacyMap[92] = "Jabalpur University";
+            legacyMap[93] = "Banaras Hindu University (BHU), Varanasi";
+            legacyMap[94] = "Burdwan University";
+            legacyMap[95] = "National Institute of Technology (NIT / REC), Durgapur";
+            legacyMap[96] = "Mahatma Jyotiba Phule Rohilkhand University (MJPRU), Bareilly";
+            legacyMap[97] = "Maharshi Dayanand University, Rohtak";
+            legacyMap[98] = "Gujarat University";
+            legacyMap[99] = "B.S.B.A University, Muz,Bihar";
+            legacyMap[100] = "Mahatma Jyotiba Phule Rohilkhand University (MJPRU), Bareilly";
+            legacyMap[101] = "South Gujarat University";
+            legacyMap[102] = "Dr. B. R. Ambedkar National Institute of Technology (NIT), Jalandhar";
+            legacyMap[103] = "Jamia Millia Islamia (JMI), New Delhi";
+            legacyMap[104] = "Amaravati University";
+            legacyMap[105] = "Marthwada University";
+            legacyMap[106] = "Centre for Electronics Design Technology";
+            legacyMap[107] = "MANIPUR UNIVERSITY";
+            legacyMap[108] = "Army University";
+            legacyMap[109] = "Panjab University, Chandigarh";
+            legacyMap[110] = "IAI";
+            legacyMap[111] = "Bhopal University";
+            legacyMap[112] = "Punjab Technical University";
+            legacyMap[113] = "Dr.Ambedkar University";
+            legacyMap[114] = "Motilal Nehru National Institute of Technology (MNNIT), Allahabad";
+            legacyMap[115] = "M.B.T.I Kanpur";
+            legacyMap[116] = "I.E.T, C.S.J.M University Kanpur";
+            legacyMap[117] = "D.A.V.V, Indore";
+            legacyMap[118] = "Meghalaya Board of School Education";
+            legacyMap[119] = "North-Eastern Hill University (NEHU), Shillong";
+            legacyMap[120] = "Council for the Indian School Certificate Examinations (CISCE / ICSE / ISC)";
+            legacyMap[121] = "Assam University";
+            legacyMap[122] = "Institution of Engineers(India), Kolkatta";
+            legacyMap[123] = "Govind Ballabh Pant University of Agriculture and Technology";
+            legacyMap[124] = "University of Kerala, Thiruvananthapuram";
+            legacyMap[125] = "Patna University, Patna";
+            legacyMap[126] = "DOEACC Centre";
+            legacyMap[127] = "NIIT Ltd.";
+            legacyMap[128] = "VIDYASAGAR UNIVERSITY";
+            legacyMap[129] = "Visvesvaraya Technological University (VTU), Belagavi";
+            legacyMap[130] = "University of Kalyani";
+            legacyMap[131] = "Bengal Engineering College, Shibpore";
+            legacyMap[132] = "Pt. RaviShankar University, Raipur";
+            legacyMap[133] = "Malaviya National Institute of Technology (MNIT), Jaipur";
+            legacyMap[134] = "Sri KrishnaDevaraya University";
+            legacyMap[135] = "Nagpur University";
+            legacyMap[136] = "Kannur University";
+            legacyMap[137] = "V B University, Hazaribagh";
+            legacyMap[138] = "Sardar Vallabhbhai National Institute of Technology (SVNIT), Surat";
+            legacyMap[139] = "IIMM,Bangalore";
+            legacyMap[140] = "National Institute of Technology (NIT), Jamshedpur";
+            legacyMap[141] = "National Institute of Technology (NIT / REC), Durgapur";
+            legacyMap[142] = "National Institute of Technology (NIT / REC), Hamirpur";
+            legacyMap[143] = "National Institute of Technology (NIT / REC), Silchar";
+            legacyMap[144] = "National Institute of Technology (NIT / REC), Warangal";
+            legacyMap[145] = "Rajiv Gandhi Proudyogiki Vishwavidyalaya (RGPV), Bhopal";
+            legacyMap[146] = "National Institute of Technology (NIT), Kurukshetra";
+            legacyMap[147] = "Govind Ballab Pant Engg. College";
+            legacyMap[148] = "UPTUI, KNIT";
+            legacyMap[149] = "UP BTE, Lucknow";
+            legacyMap[150] = "West Bengal University";
+            legacyMap[151] = "ABV-Indian Institute of Information Technology and Management (ABV-IIITM), Gwalior";
+            legacyMap[152] = "BES University";
+            legacyMap[153] = "DIAT, Pune";
+            legacyMap[154] = "Kurukshetra University";
+            legacyMap[155] = "University of Calicut, Malappuram";
+            legacyMap[156] = "National Institute of Technology (NIT), Raipur";
+            legacyMap[157] = "National Institute of Technology (NIT / REC), Rourkela";
+            legacyMap[158] = "National Institute of Technology (NIT), Patna";
+            legacyMap[159] = "University of Delhi (DU), New Delhi";
+            legacyMap[160] = "Dilasagram Convent high school, ballarpur";
+            legacyMap[161] = "Gurunanak College of Science, Ballarpur";
+            legacyMap[162] = "Govt. College of Engineering, Karad";
+            legacyMap[163] = "Indian Institute of Information Technology (IIIT), Allahabad";
+            legacyMap[164] = "U A Board";
+            legacyMap[165] = "UP Board Allahabad";
+            legacyMap[166] = "Karnataka School Examination and Assessment Board (KSEEB / KSEAB), Bengaluru";
+            legacyMap[167] = "Department of Pre-University Education (PUE), Karnataka";
+            legacyMap[168] = "Visvesvaraya Technological University (VTU), Belagavi";
+            legacyMap[169] = "General Education Department";
+            legacyMap[170] = "Higher Secondary Board";
+            legacyMap[171] = "BTER Jodhpur";
+            legacyMap[172] = "West Bengal Board of Secondary Education (WBBSE)";
+            legacyMap[173] = "West Bengal Council of Higher Secondary Education (WBCHSE)";
+            legacyMap[174] = "West Bengal State Council of Technical and Vocational Education (WBSCTE), Kolkata";
+            legacyMap[175] = "Jawaharlal Nehru Technological University (JNTU), Hyderabad";
+            legacyMap[176] = "Board of Secondary School Education";
+            legacyMap[177] = "Board of Intermediate Education";
+            legacyMap[178] = "IIT, Bangalore";
+            legacyMap[179] = "BIT, Durg";
+            legacyMap[180] = "MP Board";
+            legacyMap[181] = "State Board of Technical Education and Training (SBTET), Tamil Nadu";
+            legacyMap[182] = "Andhra University, Visakhapatnam";
+            legacyMap[183] = "Indian Institute of Science (IISc), Bangalore";
+            legacyMap[184] = "Central Board of Secondary Education (CBSE), New Delhi";
+            legacyMap[185] = "Cochin University of Science and Technology (CUSAT), Kochi";
+            legacyMap[186] = "Acharya Nagarjuna University, Guntur";
+            legacyMap[187] = "Jawaharlal Nehru Technological University Anantapur (JNTUA)";
+            legacyMap[188] = "Indian Institute of Technology (IIT), Kharagpur";
+            legacyMap[189] = "State board of technical Education";
+            legacyMap[190] = "Kerala Board";
+            legacyMap[191] = "Indian Institute of Science (IISc), Bangalore";
+            legacyMap[192] = "Osmania University, Hyderabad";
+            legacyMap[193] = "National Institute of Technology (NIT / REC), Calicut";
+            legacyMap[194] = "ICSE/DPS, shimla";
+            legacyMap[195] = "CBSE/RED, Jhajjar";
+            legacyMap[196] = "K V Ponda (CBSE)";
+            legacyMap[197] = "Board of Public Exam. Kerala";
+            legacyMap[198] = "Board of Technical Education";
+            legacyMap[199] = "Z P High school";
+            legacyMap[200] = "Dept.of Tech.Edu, Kerala";
+            legacyMap[201] = "Board of Vocational HR SEC Edn";
+            legacyMap[202] = "University of Hyderabad (UoH / Central University), Hyderabad";
+            legacyMap[203] = "UP Board";
+            legacyMap[204] = "Bihar School Examination Board (BSEB), Patna";
+            legacyMap[205] = "BIEE, Bihar";
+            legacyMap[206] = "V.B.U, Hazaribag";
+            legacyMap[207] = "PSG College of Technology, Coimbatore";
+            legacyMap[208] = "Anna University, Chennai";
+            legacyMap[209] = "MAGADH UNIVERSITY BODH GAYA";
+            legacyMap[210] = "BIEC PATNA";
+            legacyMap[211] = "Veer Kunwar Singh University, ARA";
+            legacyMap[212] = "BSE, AP";
+            legacyMap[213] = "BIE, AP";
+            legacyMap[214] = "University of Bradford";
+            legacyMap[215] = "B.T.E UP";
+            legacyMap[216] = "Govt of A.P, Dept of Emp and Training";
+            legacyMap[217] = "Ministry of Labour and EMP";
+            legacyMap[218] = "Pre University Board";
+            legacyMap[219] = "West Bengal State Council of Technical and Vocational Education (WBSCTE), Kolkata";
+            legacyMap[220] = "Jiwaji University";
+            legacyMap[221] = "Central Board of Secondary Education (CBSE), New Delhi";
+            legacyMap[222] = "Indian Institute of Technology (IIT), Jodhpur";
+            legacyMap[223] = "Indian Institute of Technology (IIT), Gandhinagar";
+            legacyMap[224] = "VVB SS School";
+            legacyMap[225] = "CM science College,Darbhanga (BSEB)";
+            legacyMap[226] = "Indian Institute of Technology (IIT), Patna";
+            legacyMap[227] = "Acharya Nagarjuna University, Guntur";
+            legacyMap[228] = "Dept. Tech. Edu., Karnataka";
+            legacyMap[229] = "S.B.T.E Bihar";
+            legacyMap[230] = "B.S.E.H";
+            legacyMap[231] = "H.S.B.T.E";
+            legacyMap[232] = "UTTARAKHAND TECHNICAL UNIVERSITY";
+            legacyMap[233] = "NATIONAL COLLEGE BANGALORE";
+            legacyMap[234] = "ST. JOSEPHS COLLEGE BANGALORE";
+            legacyMap[235] = "SSC BOARD";
+            legacyMap[236] = "INTER BOARD";
+            legacyMap[237] = "National Institute of Technology (NIT / REC), Tiruchirappalli";
+            legacyMap[238] = "VINAYAKA MISSION UNIVERSITY SALEM";
+            legacyMap[239] = "CETE STQC,Hyderabad";
+            legacyMap[240] = "IDEMI MUMBAI";
+            legacyMap[241] = "Karnataka Board";
+            legacyMap[242] = "BSE, ODISHA";
+            legacyMap[243] = "HSCE, ODISHA";
+            legacyMap[244] = "SCTE and VT, ODISHA";
+            legacyMap[245] = "Sikkim Manipal University";
+            legacyMap[246] = "B.S.E.R, AJMER";
+            legacyMap[247] = "B.T.E.R, Jodhpur";
+            legacyMap[248] = "Indira Gandhi National Open University (IGNOU), New Delhi";
+            legacyMap[249] = "AMITE";
+            legacyMap[250] = "Pune Board";
+            legacyMap[251] = "Mumbai Board";
+            legacyMap[252] = "P E C, Chandigarh";
+            legacyMap[253] = "RGUKT, Basar";
+            legacyMap[254] = "Nashik Board";
+            legacyMap[255] = "Automomous. Inst of Govt of Maharashtra";
+            legacyMap[256] = "Himachal Pradesh University Shimla Himachal Pradesh";
+            legacyMap[257] = "HP BOARD OF SCHOOL EDUCATION DHARAMSHAL HIMACHAL PRADESH";
+            legacyMap[258] = "ASSAM STATE BOARD";
+            legacyMap[259] = "University of Madras, Chennai";
+            legacyMap[260] = "Bangalore University, Bengaluru";
+            legacyMap[261] = "DREXEL UNIVERSITY, PA, USA";
+            legacyMap[262] = "BIHAR INTERMEDIATE EDUCATION COUNCIL, PATNA";
+            legacyMap[263] = "Biju Patnaik University of Technology, Orissa, Rourkela";
+            legacyMap[264] = "Jawaharlal Nehru Technological University (JNTU), Hyderabad";
+            legacyMap[265] = "Karnataka State Open University";
+            legacyMap[266] = "Shivaji University, Kolhapur";
+            legacyMap[267] = "Bharati Vidypeetha University, Pune";
+            legacyMap[268] = "VHSE BOARD";
+            legacyMap[269] = "Board of Hariyana";
+            legacyMap[270] = "Oxford Evening Polytechnic, JP Nagar, Bengaluru";
+            legacyMap[271] = "Savitribai Phule Pune University (SPPU / University of Pune)";
+            legacyMap[272] = "GPM College";
+            legacyMap[273] = "GRM Sr Sec School";
+            legacyMap[274] = "National Council for Vocational Training (NCVT)";
+            legacyMap[275] = "Indian Institute of Technology (IIT), Jodhpur";
+            legacyMap[276] = "National Institute of Technology Karnataka (NITK / REC), Surathkal";
+            legacyMap[277] = "Tripura";
+            legacyMap[278] = "Indian Institute of Management (IIM), Lucknow";
+            legacyMap[279] = "AP Board";
+            legacyMap[280] = "Tamilnadu State Board";
+            legacyMap[281] = "Central University of Rajasthan, Ajmer";
+            legacyMap[282] = "University of Ajmer";
+            legacyMap[283] = "National Institute of Technology (NIT), Agartala";
+            legacyMap[284] = "Dr. A.P.J. Abdul Kalam Technical University (AKTU / UPTU), Lucknow";
+            legacyMap[285] = "CHSE, ODISHA";
+            legacyMap[286] = "CHSS, Jaipur";
+            legacyMap[287] = "JNVU, JODHPUR";
+            legacyMap[288] = "Savitribai Phule Pune University (SPPU / University of Pune)";
+            legacyMap[289] = "Indian Institute of Technology (IIT), Indore";
+            legacyMap[290] = "National Institute of Technology (NIT), Delhi";
+            legacyMap[291] = "Maulana Azad National Institute of Technology (MANIT), Bhopal";
+            legacyMap[292] = "GGV, Bilaspur";
+            legacyMap[293] = "UTTARAKHAND BOARD";
+            legacyMap[294] = "GRAPHIC ERA UNIVERSITY";
+            legacyMap[295] = "Maharashtra State Board of Secondary and Higher Secondary Education (MSBSHSE)";
+            legacyMap[296] = "VIT, PUNE";
+            legacyMap[297] = "Maharashtra State Board of Secondary and Higher Secondary Education (MSBSHSE)";
+            legacyMap[298] = "National Institute of Technology (NIT), Srinagar";
+            legacyMap[299] = "Siddarth University";
+            legacyMap[300] = "RBSE, Ajmer";
+            legacyMap[301] = "Rajasthan board";
+            legacyMap[302] = "Banarthali University";
+            legacyMap[303] = "University of Delhi (DU), New Delhi";
+            legacyMap[304] = "Board of Secondary Education, Assam (SEBA)";
+            legacyMap[305] = "SCTE, Assam";
+            legacyMap[306] = "NERIST, Nirjuli";
+            legacyMap[307] = "Indian Institute of Technology (IIT), Hyderabad";
+            legacyMap[308] = "Dr. A.P.J. Abdul Kalam Technical University (AKTU / UPTU), Lucknow";
+            legacyMap[309] = "TRRRSVM MIC Kashipur";
+            legacyMap[310] = "Indian Institute of Technology (IIT), Mandi";
+            legacyMap[311] = "KV Bhaderwah";
+            legacyMap[312] = "BSF Sr Sec School";
+            legacyMap[313] = "Dr. A.P.J. Abdul Kalam Technical University (AKTU / UPTU), Lucknow";
+            legacyMap[314] = "MIT Muzaharpur";
+            legacyMap[315] = "YMCA University";
+            legacyMap[316] = "Indian Institute of Technology (IIT), Roorkee";
+            legacyMap[317] = "SDM Sr Sec School";
+            legacyMap[318] = "Green Meadows";
+            legacyMap[319] = "G.B.P.U.A.T, Pantnagar";
+            legacyMap[320] = "KV (AFS), Bormer";
+            legacyMap[321] = "Dundlod Public School Jhunjhunu";
+            legacyMap[322] = "KVM Public Sr Sec School, Sikar";
+            legacyMap[323] = "Indian Institute of Technology (BHU), Varanasi";
+            legacyMap[324] = "CMM Jabalpur";
+            legacyMap[325] = "Indian Institute of Technology (IIT), Ropar";
+            legacyMap[326] = "BVDU, Pune";
+            legacyMap[327] = "MIT-SDE, Pune";
+            legacyMap[328] = "GOVT.POLYTECHNIC BANKA";
+            legacyMap[329] = "DNS COLLEGE BHUSIARAJOUN";
+            legacyMap[330] = "H.S.SALEMPUR";
+            legacyMap[331] = "SBTE, Bihar";
+            legacyMap[332] = "JAC board";
+            legacyMap[333] = "SBTE Jharkhand";
+            legacyMap[334] = "SSIS,DERABASSI";
+            legacyMap[335] = "GMSSS,CHANDIGARH SEC-16";
+            legacyMap[336] = "GGDSD,PUNJAB UNIVERSITY";
+            legacyMap[337] = "SSK NAND INTERCOLL";
+            legacyMap[338] = "Indian Institute of Technology (IIT), Bhubaneswar";
+            legacyMap[339] = "S.V GOVT POLYTECHNIC";
+            legacyMap[340] = "Council for the Indian School Certificate Examinations (CISCE / ICSE / ISC)";
+            legacyMap[341] = "Council for the Indian School Certificate Examinations (CISCE / ICSE / ISC)";
+            legacyMap[342] = "Uttarakhand Board of Technical Education, Roorkee (UBTER)";
+            legacyMap[343] = "Board of Secondary Education, Assam (SEBA)";
+            legacyMap[344] = "Assam Higher Secondary Education Council (AHSEC)";
+            legacyMap[345] = "West Bengal Board of Secondary Education (WBBSE)";
+            legacyMap[346] = "West Bengal Council of Higher Secondary Education (WBCHSE)";
+            legacyMap[347] = "Maharashtra State Board of Secondary and Higher Secondary Education (MSBSHSE)";
+            legacyMap[348] = "Hemwanti Nandan Bahuguna Garhwal University";
+            legacyMap[349] = "MADAN MOHAN MALAVIYA UNIVERSITY OF TECHNOLOGY, GORAKHPUR, UP";
+                _legacyUnivMap = legacyMap;
+            }
+            return _legacyUnivMap;
+        }
+
+        public static string GetCanonicalLegacyUniversity(int uid, string colName)
+        {
+            var map = GetLegacyUniversityMap();
+            if (uid >= 0 && map.ContainsKey(uid))
+            {
+                return map[uid];
+            }
+            if (!string.IsNullOrWhiteSpace(colName) && !IsPlaceholderOrInvalid(colName))
+            {
+                return NormalizeUniversityName(colName);
+            }
+            return "Not Specified";
         }
 
         public static bool AddUniversity(string name, string stateOrType)
@@ -2521,12 +3977,20 @@ namespace EducationApp.Utils
 
                     string mainName = qualNames.ContainsKey(mainCode) ? qualNames[mainCode] : mainCode;
 
-                    // University resolution
-                    string instName = r["COLLEGENAME"] != DBNull.Value ? r["COLLEGENAME"].ToString() : "Not Specified";
+                    // University resolution using canonical legacy catalog & aliases
+                    int uid = -1;
                     if (r["UNIVINSTID"] != DBNull.Value)
                     {
-                        int uid = Convert.ToInt32(r["UNIVINSTID"]);
-                        if (univDict.ContainsKey(uid)) instName = univDict[uid];
+                        int.TryParse(r["UNIVINSTID"].ToString(), out uid);
+                    }
+                    string rawCol = r["COLLEGENAME"] != DBNull.Value ? r["COLLEGENAME"].ToString() : "";
+                    string instName = GetCanonicalLegacyUniversity(uid, rawCol);
+                    instName = NormalizeUniversityName(instName);
+
+                    // Ensure university is registered in EDU_UNIVERSITY master table globally for ALL users
+                    if (!IsPlaceholderOrInvalid(instName))
+                    {
+                        instName = EnsureUniversityExists(instName, "Recognized Institution");
                     }
 
                     // Subject / Specialization resolution
@@ -2546,15 +4010,21 @@ namespace EducationApp.Utils
                     string desig = empInfo.Item3 ?? "";
                     string div = empInfo.Item4 ?? "";
 
-                    int yearPassed = r["YEARPASSED"] != DBNull.Value ? Convert.ToInt32(r["YEARPASSED"]) : 2000;
-                    string grade = r["GRADE"] != DBNull.Value ? r["GRADE"].ToString() : "Pass";
+                    int yearPassed = 2000;
+                    if (r["YEARPASSED"] != DBNull.Value)
+                    {
+                        int.TryParse(r["YEARPASSED"].ToString(), out yearPassed);
+                    }
+
+                    string rawGrade = r["GRADE"] != DBNull.Value ? r["GRADE"].ToString() : "";
+                    string normGrade = NormalizeGrade(rawGrade);
                     string pct = r["PERCENTAGE"] != DBNull.Value ? r["PERCENTAGE"].ToString() : "N/A";
                     string college = r["COLLEGENAME"] != DBNull.Value ? r["COLLEGENAME"].ToString() : "";
 
-                    // If record contains placeholder values like '*', force to Draft so employee must verify and select proper values
+                    // If record contains placeholder values or missing/invalid grade, force to Draft so employee must verify and select proper values
                     string rowStatus = defaultStatus;
                     if (IsPlaceholderOrInvalid(college) || IsPlaceholderOrInvalid(instName) ||
-                        IsInvalidSpecialization(specName) || IsPlaceholderOrInvalid(grade) ||
+                        IsInvalidSpecialization(specName) || string.IsNullOrEmpty(normGrade) || !IsValidGrade(normGrade) ||
                         IsPlaceholderOrInvalid(pct) ||
                         yearPassed < 1950)
                     {
@@ -2577,6 +4047,23 @@ namespace EducationApp.Utils
                                 finalScore = pNum.ToString("0.##") + " CGPA";
                             }
                         }
+                    }
+
+                    // Check if this exact qualification already exists for this employee in EDU_EMP_EDUCATION
+                    string checkQualExists = @"
+                        SELECT COUNT(*) FROM EDU_EMP_EDUCATION 
+                        WHERE PCNO = :PCNO AND QUAL_MAIN_CODE = :MC AND QUAL_SUB_CODE = :SC AND YEAR_PASSED = :YP";
+                    object qualExistsObj = ExecuteScalar(checkQualExists,
+                        new OracleParameter("PCNO", pcno),
+                        new OracleParameter("MC", mainCode),
+                        new OracleParameter("SC", subCode),
+                        new OracleParameter("YP", yearPassed));
+
+                    if (qualExistsObj != null && Convert.ToInt32(qualExistsObj) > 0)
+                    {
+                        totalSkipped++;
+                        skippedAlreadyMigrated++;
+                        continue;
                     }
 
                     string insertSql = @"
@@ -2609,7 +4096,7 @@ namespace EducationApp.Utils
                         new OracleParameter("COLL", college),
                         new OracleParameter("SPEC", specName),
                         new OracleParameter("CGPA", finalScore),
-                        new OracleParameter("GRD", grade),
+                        new OracleParameter("GRD", !string.IsNullOrEmpty(normGrade) ? (object)normGrade : DBNull.Value),
                         new OracleParameter("HIGH", isHighest ? 1 : 0),
                         new OracleParameter("REM", DBNull.Value),
                         new OracleParameter("ST", rowStatus),
@@ -2618,6 +4105,37 @@ namespace EducationApp.Utils
 
                     totalMigrated++;
                 }
+
+                // Post-migration deduplication of IS_HIGHEST: Ensure at most one record per employee has IS_HIGHEST = 1
+                try
+                {
+                    string dedupeHighestSql = @"
+                        MERGE INTO EDU_EMP_EDUCATION dest
+                        USING (
+                            SELECT EDU_ID, 
+                                   ROW_NUMBER() OVER (PARTITION BY PCNO ORDER BY YEAR_PASSED DESC, EDU_ID DESC) AS RN
+                            FROM EDU_EMP_EDUCATION
+                            WHERE IS_HIGHEST = 1
+                        ) src
+                        ON (dest.EDU_ID = src.EDU_ID AND src.RN > 1)
+                        WHEN MATCHED THEN UPDATE SET dest.IS_HIGHEST = 0";
+                    ExecuteNonQuery(dedupeHighestSql);
+
+                    string ensureHighestSql = @"
+                        MERGE INTO EDU_EMP_EDUCATION dest
+                        USING (
+                            SELECT EDU_ID,
+                                   ROW_NUMBER() OVER (PARTITION BY PCNO ORDER BY YEAR_PASSED DESC, EDU_ID DESC) AS RN
+                            FROM EDU_EMP_EDUCATION e1
+                            WHERE NOT EXISTS (
+                                SELECT 1 FROM EDU_EMP_EDUCATION e2 WHERE e2.PCNO = e1.PCNO AND e2.IS_HIGHEST = 1
+                            )
+                        ) src
+                        ON (dest.EDU_ID = src.EDU_ID AND src.RN = 1)
+                        WHEN MATCHED THEN UPDATE SET dest.IS_HIGHEST = 1";
+                    ExecuteNonQuery(ensureHighestSql);
+                }
+                catch { }
 
                 // Log migration
                 string logDetails = string.Format(

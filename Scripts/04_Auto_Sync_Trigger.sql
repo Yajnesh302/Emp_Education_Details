@@ -28,6 +28,7 @@ DECLARE
     v_emp_name   VARCHAR2(150);
     v_desig      VARCHAR2(100);
     v_div        VARCHAR2(100);
+    v_grade_norm VARCHAR2(50)  := NULL;
     v_is_highest NUMBER(1)     := 0;
     v_exists     NUMBER        := 0;
     v_emp_found  NUMBER        := 0;
@@ -89,15 +90,25 @@ BEGIN
             v_main_name := v_main_code;
     END;
 
-    -- 2. Resolve University / Board Name
-    v_inst_name := NVL(:NEW.COLLEGENAME, 'Not Specified');
-    IF :NEW.UNIVINSTID IS NOT NULL AND :NEW.UNIVINSTID > 0 THEN
+    -- 2. Resolve University / Board Name using canonical legacy resolution
+    v_inst_name := PKG_EDU_MIGRATION.FN_RESOLVE_LEGACY_UNIV(:NEW.UNIVINSTID, :NEW.COLLEGENAME);
+
+    -- If university is not yet registered in EDU_UNIVERSITY master table,
+    -- automatically insert it globally so it is available to ALL users across the application
+    IF v_inst_name IS NOT NULL AND TRIM(v_inst_name) NOT IN ('Not Specified', '*', 'None', 'NA', 'N/A', '') THEN
+        DECLARE
+            v_univ_cnt NUMBER := 0;
         BEGIN
-            SELECT UNIV_NAME INTO v_inst_name 
+            SELECT COUNT(*) INTO v_univ_cnt 
             FROM EDU_UNIVERSITY 
-            WHERE UNIV_ID = :NEW.UNIVINSTID AND ROWNUM = 1;
+            WHERE UPPER(TRIM(UNIV_NAME)) = UPPER(TRIM(v_inst_name));
+
+            IF v_univ_cnt = 0 THEN
+                INSERT INTO EDU_UNIVERSITY (UNIV_ID, UNIV_NAME, STATE_OR_TYPE, IS_ACTIVE)
+                VALUES (SEQ_EDU_UNIVERSITY.NEXTVAL, TRIM(v_inst_name), 'Recognized University / Board', 1);
+            END IF;
         EXCEPTION
-            WHEN NO_DATA_FOUND THEN
+            WHEN OTHERS THEN
                 NULL;
         END;
     END IF;
@@ -142,15 +153,29 @@ BEGIN
                   AND ROWNUM = 1;
             EXCEPTION
                 WHEN NO_DATA_FOUND THEN
-                    NULL; -- Keep mapping default v_sub_code and v_sub_name := v_spec
+                    -- Resolve canonical Sub-Qualification Name from EDU_QUAL_SUB for the mapped sub code
+                    BEGIN
+                        SELECT SUB_NAME INTO v_sub_name
+                        FROM EDU_QUAL_SUB
+                        WHERE SUB_CODE = v_sub_code
+                          AND (MAIN_QUAL_CODE = v_main_code OR MAIN_QUAL_CODE IS NULL)
+                          AND ROWNUM = 1;
+                    EXCEPTION
+                        WHEN NO_DATA_FOUND THEN
+                            NULL; -- Retain fallback
+                    END;
             END;
     END;
 
     -- 4. Check if record already exists in EDU_EMP_EDUCATION
-    -- If existing data already exists, DO NOT trigger or modify existing data
+    -- If record with same OLD_CTREDN or exact same qualification + year exists, DO NOT insert duplicate
     SELECT COUNT(*) INTO v_exists 
     FROM EDU_EMP_EDUCATION 
-    WHERE PCNO = :NEW.PCNO AND OLD_CTREDN = :NEW.CTREDN;
+    WHERE PCNO = :NEW.PCNO 
+      AND (
+          OLD_CTREDN = :NEW.CTREDN
+          OR (QUAL_MAIN_CODE = v_main_code AND QUAL_SUB_CODE = v_sub_code AND YEAR_PASSED = NVL(:NEW.YEARPASSED, 2000))
+      );
 
     IF v_exists > 0 THEN
         -- Existing record found: do not trigger or alter existing records
@@ -166,7 +191,10 @@ BEGIN
         v_is_highest := 0;
     END IF;
 
-    -- 6. INSERT new row with default 'Draft' status so employee can review and submit
+    -- 6. Normalize Grade / Division (do not fabricate fake 'Pass' values)
+    v_grade_norm := PKG_EDU_MIGRATION.FN_NORMALIZE_GRADE(:NEW.GRADE);
+
+    -- 7. INSERT new row with default 'Draft' status so employee can review and submit
     INSERT INTO EDU_EMP_EDUCATION (
         PCNO, EMP_NAME, DESIGNATION, DIVISION_NAME,
         QUAL_MAIN_CODE, QUAL_MAIN_NAME, QUAL_SUB_CODE, QUAL_SUB_NAME,
@@ -177,7 +205,7 @@ BEGIN
         :NEW.PCNO, v_emp_name, v_desig, v_div,
         v_main_code, v_main_name, v_sub_code, v_sub_name,
         NVL(:NEW.YEARPASSED, 2000), v_inst_name, :NEW.COLLEGENAME, v_spec,
-        NVL(TO_CHAR(:NEW.PERCENTAGE), 'N/A'), NVL(:NEW.GRADE, 'Pass'), v_is_highest,
+        NVL(TO_CHAR(:NEW.PERCENTAGE), 'N/A'), v_grade_norm, v_is_highest,
         NULL, 'Draft',
         NULL, SYSDATE, 'AUTO_TRIGGER', 1, :NEW.CTREDN
     );

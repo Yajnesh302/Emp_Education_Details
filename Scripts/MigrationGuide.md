@@ -129,20 +129,20 @@ OLD_CTREDN NUMBER                             -- Keeps track of original HR reco
 
 ### 4.2 `02_Seed_MasterData.sql` — The Data You Need to Start
 
-**What it does:** Fills all the master tables with real data so dropdowns in the application are populated.
+**What it does:** Fills all the master tables with real, deduplicated seed data sourced from `education values _ filtered.txt` so dropdowns in the application are fully populated.
 
-**Run when:** Right after `01_Schema_DDL.sql`. Also safe to re-run anytime — it uses `MERGE` statements which only insert if the record does not already exist (no duplicates).
+**Run when:** Right after `01_Schema_DDL.sql`. Also safe to re-run anytime — it uses `MERGE` statements and clean `INSERT`s that do not produce duplicate entries.
 
 **What it inserts:**
 
-| Section | What's Inserted | Approx Count |
+| Section | What's Inserted | Exact Count |
 |---|---|---|
 | Admin Users | Default admin (PCNO: 1001) | 1 record |
-| Main Qualifications (`EDU_QUAL_MAIN`) | B.E., M.Tech, ITI, MBA, MBBS, 10th, 12th, Diploma, PhD, etc. | 100+ qualifications |
-| Sub-Qualifications (`EDU_QUAL_SUB`) | Branches under each — e.g., B.E. → Civil, Mechanical, CS | Hundreds |
-| Universities (`EDU_UNIVERSITY`) | List of universities and boards (state-wise) | Hundreds |
-| Subjects (`EDU_SUBJECT`) | Specialization subjects | Many records |
-| Qualification Mapping (`EDU_QUAL_MAPPING`) | Maps old HR `QFNID` numbers to new qualification codes | Matches old HR data |
+| Main Qualifications (`EDU_QUAL_MAIN`) | Deduplicated canonical UGC/AICTE degree catalog (B.E., M.Tech, ITI, MBA, MBBS, 10th, 12th, Diploma, PhD, etc.) | 257 distinct qualifications |
+| Sub-Qualifications (`EDU_QUAL_SUB`) | Degree-specific branches & specializations (e.g. BE → CS, EC, Civil, Mech, etc.) | 2,928 specializations |
+| Universities (`EDU_UNIVERSITY`) | Canonical university catalog with duplicate titles & abbreviations merged (VTU, IGNOU, AKTU, NITK, etc.) | 434 canonical institutions |
+| Subjects (`EDU_SUBJECT`) | Legacy & new subject disciplines (`SUBJECT_ID` 0-109) | 110 subjects |
+| Qualification Mapping (`EDU_QUAL_MAPPING`) | Full mapping for all legacy `QFNID`s (0-93) to `QUAL_MAIN_CODE` and `QUAL_SUB_CODE` | 94 mappings |
 
 **Why `MERGE` instead of `INSERT`?**
 
@@ -152,9 +152,20 @@ A `MERGE` statement checks if a record with the same key already exists:
 
 This means you can run `02_Seed_MasterData.sql` multiple times without duplicating data. This is very useful during upgrades.
 
-**Important for deployment:** This file is comprehensive (~198KB, 1,328+ lines) containing 140+ UGC/AICTE main qualifications, linked degree-specific sub-qualifications, and 548+ Central/State universities and examination boards. Run it completely — do not stop midway. In SQL Developer, use **Run Script (F5)** not **Run Statement (Ctrl+Enter)**.
+**Important for deployment:** This file is comprehensive (~552KB, 3,853 lines) containing all 257 deduplicated UGC/AICTE main qualifications, 2,928 linked sub-qualifications, 434 canonical universities, 110 subjects, and 94 legacy qualification mappings. Run it completely — do not stop midway. In SQL Developer, use **Run Script (F5)** not **Run Statement (Ctrl+Enter)**.
 
 ---
+
+### 4.2.1 Global University Auto-Registration & Canonical Resolution
+
+**How Missing Universities are Handled:**
+Previously, if a university was not in the master list, the application added it only to that specific user's dropdown in-memory for their session. Now, this behavior is permanently fixed across the stack:
+- **During Migration (`03_Migration_Procedure.sql` & C# Migration):**
+  1. The legacy `UNIVINSTID` is looked up in the canonical mapping (`FN_RESOLVE_LEGACY_UNIV` in PL/SQL and `GetLegacyUniversityMap()` in C#). All 58 abbreviation aliases (such as VTU ID 168 -> Visvesvaraya Technological University, IGNOU ID 248 -> 89, UPTU ID 8 -> AKTU 284, NITK ID 276 -> 16, etc.) are automatically normalized to their canonical names.
+  2. If an unrecognized university is encountered, it is automatically inserted into `EDU_UNIVERSITY` using `SEQ_EDU_UNIVERSITY.NEXTVAL` with `IS_ACTIVE = 1`. This makes the university immediately and permanently available **globally to all users**.
+- **During User Profile Entry (`EmployeeEducation.aspx.cs`):**
+  When a user saves or edits a record with a custom university name, `DBHelper.EnsureUniversityExists(name)` checks case-insensitively and automatically inserts the institution into `EDU_UNIVERSITY` if not already present. It is never scoped to a single user in-memory anymore.
+
 
 ### 4.3 `03_Migration_Procedure.sql` — Importing Old HR Data
 
@@ -265,6 +276,18 @@ ALTER TRIGGER TRG_SYNC_HR_EMP_EDU ENABLE;
 ```
 
 ---
+
+### 4.5 `05_Deduplicate_Universities.sql` — University Deduplication & Post-Migration Cleanup
+
+**What it does:** Runs maintenance cleanup on existing Oracle databases that already had duplicate rows or legacy abbreviations in `EDU_UNIVERSITY` and `EDU_EMP_EDUCATION`:
+1. Remaps all legacy duplicate IDs (e.g., ID 168 VTU -> ID 129 Visvesvaraya Technological University, ID 248 -> 89 IGNOU, ID 8 -> 284 AKTU, ID 276 -> 16 NITK) across existing `EDU_EMP_EDUCATION` records.
+2. Deletes duplicate alias rows from `EDU_UNIVERSITY` so the university dropdown displays only clean, canonical titles.
+3. Automatically identifies any unlisted, novel universities currently stored in `EDU_EMP_EDUCATION` and inserts them into `EDU_UNIVERSITY` using `SEQ_EDU_UNIVERSITY.NEXTVAL` so they become globally available to all users.
+
+**Run when:**
+- Whenever upgrading an existing database where duplicate universities or abbreviation rows were previously populated.
+- Safe and idempotent to run on demand.
+
 
 ## 5. Step-by-Step: Fresh Deployment on a New PC
 

@@ -20,6 +20,7 @@ namespace EducationApp {
         protected global::System.Web.UI.WebControls.GridView gvEducation;
         protected global::System.Web.UI.WebControls.PlaceHolder phBottomSubmitBtn;
         protected global::System.Web.UI.WebControls.Button btnBottomFinalSubmit;
+        protected global::System.Web.UI.WebControls.HiddenField hfModalOpen;
         protected global::System.Web.UI.WebControls.Panel pnlModal;
         protected global::System.Web.UI.WebControls.Literal litModalTitle;
         protected global::System.Web.UI.WebControls.LinkButton btnCloseModalX;

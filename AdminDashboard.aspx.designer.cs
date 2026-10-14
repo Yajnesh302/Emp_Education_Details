@@ -12,11 +12,16 @@ namespace EducationApp {
         protected global::System.Web.UI.WebControls.TextBox txtSearch;
         protected global::System.Web.UI.WebControls.DropDownList ddlStatusFilter;
         protected global::System.Web.UI.WebControls.DropDownList ddlQualFilter;
+        protected global::System.Web.UI.WebControls.DropDownList ddlHighestFilter;
         protected global::System.Web.UI.WebControls.Button btnFilter;
+        protected global::System.Web.UI.WebControls.Button btnResetFilter;
         protected global::System.Web.UI.WebControls.Literal litFilteredCount;
+        protected global::System.Web.UI.WebControls.Literal litPagingSummary;
+        protected global::System.Web.UI.WebControls.DropDownList ddlPageSize;
         protected global::System.Web.UI.WebControls.GridView gvAdminEducation;
 
         // In-Page Admin Edit Modal Controls
+        protected global::System.Web.UI.WebControls.HiddenField hfModalOpen;
         protected global::System.Web.UI.WebControls.Panel pnlModal;
         protected global::System.Web.UI.WebControls.Literal litEditEmpName;
         protected global::System.Web.UI.WebControls.Literal litEditEmpPCNO;

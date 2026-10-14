@@ -288,6 +288,7 @@ namespace EducationApp
             }
             else if (e.CommandName == "DeleteRow")
             {
+                CloseAllModals();
                 try
                 {
                     bool deleted = DBHelper.DeleteMainQualification(code);
@@ -382,6 +383,7 @@ namespace EducationApp
             }
             else if (e.CommandName == "DeleteRow")
             {
+                CloseAllModals();
                 try
                 {
                     bool deleted = DBHelper.DeleteSubQualification(subId);
@@ -475,6 +477,7 @@ namespace EducationApp
             }
             else if (e.CommandName == "DeleteRow")
             {
+                CloseAllModals();
                 try
                 {
                     bool deleted = DBHelper.DeleteUniversity(univId);
@@ -577,6 +580,7 @@ namespace EducationApp
             }
             else if (e.CommandName == "DeleteRow")
             {
+                CloseAllModals();
                 try
                 {
                     bool deleted = DBHelper.DeleteCollege(collegeId);
@@ -671,6 +675,7 @@ namespace EducationApp
             }
             else if (e.CommandName == "DeleteRow")
             {
+                CloseAllModals();
                 try
                 {
                     bool deleted = DBHelper.DeleteSubject(subjId);
@@ -739,6 +744,7 @@ namespace EducationApp
 
             if (e.CommandName == "ToggleActive")
             {
+                CloseAllModals();
                 if (pcno == "1001")
                 {
                     ShowAlert("Primary system administrator (PCNO 1001) cannot be revoked.", "warning");
@@ -797,6 +803,7 @@ namespace EducationApp
             }
             else if (e.CommandName == "DeleteRow")
             {
+                CloseAllModals();
                 if (pcno == "1001")
                 {
                     ShowAlert("Primary system administrator (PCNO 1001) cannot be deleted.", "warning");

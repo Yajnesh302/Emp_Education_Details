@@ -328,7 +328,84 @@ WHERE ROWID NOT IN (
     GROUP BY UPPER(TRIM(UNIV_NAME))
 );
 
+-- ------------------------------------------------------------------------
+-- STEP 4: Ensure Any Custom / Migrated Universities in EDU_EMP_EDUCATION
+--         Are Added to EDU_UNIVERSITY Master Table Globally
+-- ------------------------------------------------------------------------
+INSERT INTO EDU_UNIVERSITY (UNIV_ID, UNIV_NAME, STATE_OR_TYPE, IS_ACTIVE)
+SELECT SEQ_EDU_UNIVERSITY.NEXTVAL, sub.INST_NAME, 'Recognized Institution', 1
+FROM (
+    SELECT DISTINCT TRIM(INSTITUTE_NAME) AS INST_NAME
+    FROM EDU_EMP_EDUCATION
+    WHERE INSTITUTE_NAME IS NOT NULL 
+      AND TRIM(INSTITUTE_NAME) NOT IN ('Not Specified', '*', 'None', 'NA', 'N/A', '')
+      AND UPPER(TRIM(INSTITUTE_NAME)) NOT IN (SELECT UPPER(TRIM(UNIV_NAME)) FROM EDU_UNIVERSITY)
+) sub;
+
 COMMIT;
 
-PROMPT [SUCCESS] University deduplication completed successfully!
+-- ------------------------------------------------------------------------
+-- STEP 5: Harmonize Grades in EDU_EMP_EDUCATION & Revert Missing to Draft
+-- ------------------------------------------------------------------------
+PROMPT [INFO] Harmonizing legacy grade strings in EDU_EMP_EDUCATION...
+
+-- Map known variations to canonical dropdown options
+UPDATE EDU_EMP_EDUCATION
+SET GRADE_DIVISION = 'Pass Class'
+WHERE UPPER(TRIM(GRADE_DIVISION)) IN ('PASS', 'PASS CLASS', 'P');
+
+UPDATE EDU_EMP_EDUCATION
+SET GRADE_DIVISION = 'First Class with Distinction'
+WHERE UPPER(TRIM(GRADE_DIVISION)) IN ('DISTINCTION', 'FIRST CLASS WITH DISTINCTION', 'FIRST WITH DISTINCTION', 'FWD', 'DIST');
+
+UPDATE EDU_EMP_EDUCATION
+SET GRADE_DIVISION = 'First Class'
+WHERE UPPER(TRIM(GRADE_DIVISION)) IN ('FIRST CLASS', '1ST CLASS', 'FIRST', '1ST');
+
+UPDATE EDU_EMP_EDUCATION
+SET GRADE_DIVISION = 'Second Class'
+WHERE UPPER(TRIM(GRADE_DIVISION)) IN ('SECOND CLASS', '2ND CLASS', 'SECOND', '2ND');
+
+UPDATE EDU_EMP_EDUCATION
+SET GRADE_DIVISION = 'Grade A+'
+WHERE UPPER(TRIM(GRADE_DIVISION)) IN ('GRADE A+', 'A+');
+
+UPDATE EDU_EMP_EDUCATION
+SET GRADE_DIVISION = 'Grade A'
+WHERE UPPER(TRIM(GRADE_DIVISION)) IN ('GRADE A', 'A');
+
+UPDATE EDU_EMP_EDUCATION
+SET GRADE_DIVISION = 'Grade B+'
+WHERE UPPER(TRIM(GRADE_DIVISION)) IN ('GRADE B+', 'B+');
+
+UPDATE EDU_EMP_EDUCATION
+SET GRADE_DIVISION = 'Grade B'
+WHERE UPPER(TRIM(GRADE_DIVISION)) IN ('GRADE B', 'B');
+
+UPDATE EDU_EMP_EDUCATION
+SET GRADE_DIVISION = 'Exemplary'
+WHERE UPPER(TRIM(GRADE_DIVISION)) IN ('EXEMPLARY');
+
+-- For any record where GRADE_DIVISION is invalid, placeholder, or blank:
+-- Set GRADE_DIVISION to NULL and revert STATUS to 'Draft' so submission is blocked until corrected
+UPDATE EDU_EMP_EDUCATION
+SET GRADE_DIVISION = NULL,
+    STATUS = 'Draft'
+WHERE GRADE_DIVISION IS NULL 
+   OR TRIM(GRADE_DIVISION) IN ('*', '-', 'NA', 'N/A', 'NONE', 'NOT SPECIFIED', 'NULL', '')
+   OR GRADE_DIVISION NOT IN (
+       'First Class with Distinction',
+       'First Class',
+       'Second Class',
+       'Pass Class',
+       'Grade A+',
+       'Grade A',
+       'Grade B+',
+       'Grade B',
+       'Exemplary'
+   );
+
+COMMIT;
+
+PROMPT [SUCCESS] University and Grade deduplication completed successfully!
 PROMPT Canonical VTU Entry: ID 129 -> 'Visvesvaraya Technological University (VTU), Belagavi'

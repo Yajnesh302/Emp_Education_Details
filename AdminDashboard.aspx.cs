@@ -32,6 +32,33 @@ namespace EducationApp
             }
         }
 
+        public string RenderSubQualAndSpecialization(object subQualObj, object specObj)
+        {
+            string subQual = subQualObj != null ? subQualObj.ToString().Trim() : "";
+            string spec = specObj != null ? specObj.ToString().Trim() : "";
+
+            bool hasSub = !string.IsNullOrEmpty(subQual) && !DBHelper.IsPlaceholderOrInvalid(subQual);
+            bool hasSpec = !string.IsNullOrEmpty(spec) && !DBHelper.IsInvalidSpecialization(spec);
+
+            if (hasSub && hasSpec)
+            {
+                if (string.Equals(subQual, spec, StringComparison.OrdinalIgnoreCase))
+                {
+                    return Server.HtmlEncode(subQual);
+                }
+                return Server.HtmlEncode(subQual) + " &bull; <span class='text-dark font-weight-medium'>" + Server.HtmlEncode(spec) + "</span>";
+            }
+            else if (hasSub)
+            {
+                return Server.HtmlEncode(subQual);
+            }
+            else if (hasSpec)
+            {
+                return Server.HtmlEncode(spec);
+            }
+            return "<span class='text-muted'>&mdash;</span>";
+        }
+
         private void PopulateFilters()
         {
             DataTable dtMain = DBHelper.GetMainQualifications(false);
@@ -56,8 +83,28 @@ namespace EducationApp
             string search = txtSearch.Text.Trim();
             string status = ddlStatusFilter.SelectedValue;
             string qual = ddlQualFilter.SelectedValue;
+            string highest = ddlHighestFilter != null ? ddlHighestFilter.SelectedValue : "ALL";
 
-            DataTable dt = DBHelper.GetAdminEducationOverview(search, status, qual, "ALL");
+            DataTable dt = DBHelper.GetAdminEducationOverview(search, status, qual, "ALL", highest);
+            
+            int totalRecords = dt != null ? dt.Rows.Count : 0;
+            litFilteredCount.Text = totalRecords.ToString("N0");
+
+            // Apply selected page size
+            int pageSize = 25;
+            if (ddlPageSize != null && int.TryParse(ddlPageSize.SelectedValue, out int ps) && ps > 0)
+            {
+                pageSize = ps;
+            }
+            gvAdminEducation.PageSize = pageSize;
+
+            // Guard against out-of-bounds PageIndex after filtering or page size change
+            int maxPageIndex = totalRecords > 0 ? (int)Math.Ceiling((double)totalRecords / pageSize) - 1 : 0;
+            if (gvAdminEducation.PageIndex > maxPageIndex)
+            {
+                gvAdminEducation.PageIndex = Math.Max(0, maxPageIndex);
+            }
+
             gvAdminEducation.DataSource = dt;
             gvAdminEducation.DataBind();
 
@@ -66,11 +113,67 @@ namespace EducationApp
                 gvAdminEducation.HeaderRow.TableSection = TableRowSection.TableHeader;
             }
 
-            litFilteredCount.Text = (dt != null ? dt.Rows.Count : 0).ToString();
+            // Calculate range for summary display
+            if (totalRecords == 0)
+            {
+                litPagingSummary.Text = "No records found";
+            }
+            else
+            {
+                int startRow = (gvAdminEducation.PageIndex * pageSize) + 1;
+                int endRow = Math.Min((gvAdminEducation.PageIndex + 1) * pageSize, totalRecords);
+                int totalPages = (int)Math.Ceiling((double)totalRecords / pageSize);
+                int currentPage = gvAdminEducation.PageIndex + 1;
+                litPagingSummary.Text = $"Showing {startRow:N0} - {endRow:N0} of {totalRecords:N0} (Page {currentPage} of {totalPages})";
+            }
+        }
+
+        protected void gvAdminEducation_PageIndexChanging(object sender, GridViewPageEventArgs e)
+        {
+            pnlModal.Style["display"] = "none";
+            hfModalOpen.Value = "0";
+            hfEditEduId.Value = "0";
+            pnlFormError.Visible = false;
+
+            gvAdminEducation.PageIndex = e.NewPageIndex;
+            BindGrid();
+        }
+
+        protected void ddlPageSize_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            pnlModal.Style["display"] = "none";
+            hfModalOpen.Value = "0";
+            hfEditEduId.Value = "0";
+            pnlFormError.Visible = false;
+
+            gvAdminEducation.PageIndex = 0;
+            BindGrid();
         }
 
         protected void btnFilter_Click(object sender, EventArgs e)
         {
+            pnlModal.Style["display"] = "none";
+            hfModalOpen.Value = "0";
+            hfEditEduId.Value = "0";
+            pnlFormError.Visible = false;
+
+            gvAdminEducation.PageIndex = 0;
+            BindGrid();
+        }
+
+        protected void btnResetFilter_Click(object sender, EventArgs e)
+        {
+            txtSearch.Text = string.Empty;
+            ddlStatusFilter.SelectedValue = "ALL";
+            ddlQualFilter.SelectedValue = "ALL";
+            if (ddlHighestFilter != null) ddlHighestFilter.SelectedValue = "ALL";
+
+            pnlModal.Style["display"] = "none";
+            hfModalOpen.Value = "0";
+            hfEditEduId.Value = "0";
+            pnlFormError.Visible = false;
+
+            gvAdminEducation.PageIndex = 0;
             BindGrid();
         }
 
@@ -83,6 +186,11 @@ namespace EducationApp
             }
             else if (e.CommandName == "RevertToDraft")
             {
+                pnlModal.Style["display"] = "none";
+                hfModalOpen.Value = "0";
+                hfEditEduId.Value = "0";
+                pnlFormError.Visible = false;
+
                 int eduId = Convert.ToInt32(e.CommandArgument);
                 try
                 {
@@ -105,6 +213,11 @@ namespace EducationApp
             }
             else if (e.CommandName == "SubmitToFinal")
             {
+                pnlModal.Style["display"] = "none";
+                hfModalOpen.Value = "0";
+                hfEditEduId.Value = "0";
+                pnlFormError.Visible = false;
+
                 int eduId = Convert.ToInt32(e.CommandArgument);
                 try
                 {
@@ -137,16 +250,30 @@ namespace EducationApp
             ddlMainQual.DataBind();
             ddlMainQual.Items.Insert(0, new ListItem("-- Select Main Qualification --", ""));
 
-            // Universities
+            // Universities & Certifying Bodies
             DataTable dtUniv = DBHelper.GetUniversities(true);
             ddlUniversity.DataSource = dtUniv;
             ddlUniversity.DataTextField = "UNIV_NAME";
             ddlUniversity.DataValueField = "UNIV_NAME";
             ddlUniversity.DataBind();
-            ddlUniversity.Items.Insert(0, new ListItem("-- Select University / Board --", ""));
-            if (ddlUniversity.Items.FindByText("Other Recognized University / Board") == null)
+            ddlUniversity.Items.Insert(0, new ListItem("-- Select University / Board / Certifying Authority --", ""));
+
+            string[] fallbackAuthorities = new string[] {
+                "National Council for Vocational Training (NCVT) / DGT",
+                "Directorate General of Training (DGT), Ministry of Skill Development",
+                "Defence Research and Development Organisation (DRDO / LRDE)",
+                "Centre for Development of Advanced Computing (C-DAC)",
+                "National Institute of Electronics & Information Technology (NIELIT / DOEACC)",
+                "State Board of Technical Education and Training (SBTET / DTE)",
+                "Other Recognized Certifying Body / Institute",
+                "Other Recognized University / Board"
+            };
+            foreach (var auth in fallbackAuthorities)
             {
-                ddlUniversity.Items.Add(new ListItem("Other Recognized University / Board", "Other Recognized University / Board"));
+                if (ddlUniversity.Items.FindByText(auth) == null)
+                {
+                    ddlUniversity.Items.Add(new ListItem(auth, auth));
+                }
             }
 
             // Passing Years
@@ -176,6 +303,7 @@ namespace EducationApp
             ddlSubQual.Items.Clear();
             ddlSubQual.Items.Add(new ListItem("-- Select Sub Qualification / Stream --", ""));
 
+            var seenPairs = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (dtSub != null)
             {
                 foreach (DataRow r in dtSub.Rows)
@@ -183,6 +311,10 @@ namespace EducationApp
                     string subCode = r["SUB_CODE"].ToString().Trim();
                     string subName = r["SUB_NAME"].ToString().Trim();
                     string mainCode = r["MAIN_QUAL_CODE"] != DBNull.Value ? r["MAIN_QUAL_CODE"].ToString().Trim() : "";
+
+                    string key = mainCode + "|" + subCode;
+                    if (seenPairs.Contains(key)) continue;
+                    seenPairs.Add(key);
 
                     ListItem li = new ListItem(subName, subCode);
                     if (!string.IsNullOrEmpty(mainCode))
@@ -213,6 +345,8 @@ namespace EducationApp
             DataTable dtColleges = DBHelper.GetColleges();
             ddlCollege.Items.Clear();
             ddlCollege.Items.Add(new ListItem("-- Select College / School Name --", ""));
+            ddlCollege.Items.Add(new ListItem("University Campus / Department (Studied directly at University)", "University Campus / Department"));
+            ddlCollege.Items.Add(new ListItem("Direct Certification / Same as Issuing Authority (No Separate College)", "Direct Certification / Same as Issuing Authority"));
             if (dtColleges != null)
             {
                 foreach (DataRow r in dtColleges.Rows)
@@ -255,6 +389,20 @@ namespace EducationApp
                 }
             }
 
+            // Check for University Campus / Department aliases or same as selected University
+            if (item == null && (
+                college.IndexOf("University Campus", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                college.IndexOf("Same as University", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                college.IndexOf("Univ Campus", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                college.IndexOf("Direct Certification", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                college.IndexOf("Same as Issuing", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                (ddlUniversity.SelectedItem != null && !string.IsNullOrEmpty(ddlUniversity.SelectedItem.Text) &&
+                 ddlUniversity.SelectedItem.Text.Equals(college, StringComparison.OrdinalIgnoreCase))))
+            {
+                item = ddlCollege.Items.FindByValue("Direct Certification / Same as Issuing Authority") ??
+                       ddlCollege.Items.FindByValue("University Campus / Department");
+            }
+
             if (item != null && !item.Value.Equals("OTHER", StringComparison.OrdinalIgnoreCase))
             {
                 ddlCollege.SelectedValue = item.Value;
@@ -274,6 +422,10 @@ namespace EducationApp
 
         private string GetSelectedCollegeName()
         {
+            if (ddlCollege.SelectedValue == "Direct Certification / Same as Issuing Authority" || ddlCollege.SelectedValue == "University Campus / Department")
+            {
+                return ddlCollege.SelectedValue;
+            }
             if (ddlCollege.SelectedValue == "OTHER" || ddlCollege.SelectedValue.StartsWith("Other"))
             {
                 return txtCustomCollege.Text.Trim();
@@ -328,6 +480,14 @@ namespace EducationApp
             {
                 subCode = "GENERAL";
                 subName = "General (Below 10th)";
+            }
+            else
+            {
+                string canonicalSubName = DBHelper.GetSubQualificationName(mainCode, subCode);
+                if (!string.IsNullOrEmpty(canonicalSubName))
+                {
+                    subName = canonicalSubName;
+                }
             }
 
             hfSelectedSubQual.Value = subCode;
@@ -462,10 +622,11 @@ namespace EducationApp
                 }
             }
 
-            string grade = r["GRADE_DIVISION"] != DBNull.Value ? r["GRADE_DIVISION"].ToString() : "";
-            if (!DBHelper.IsPlaceholderOrInvalid(grade) && ddlGrade.Items.FindByValue(grade) != null)
+            string rawGrade = r["GRADE_DIVISION"] != DBNull.Value ? r["GRADE_DIVISION"].ToString() : "";
+            string normGrade = DBHelper.NormalizeGrade(rawGrade);
+            if (!string.IsNullOrEmpty(normGrade) && ddlGrade.Items.FindByValue(normGrade) != null)
             {
-                ddlGrade.SelectedValue = grade;
+                ddlGrade.SelectedValue = normGrade;
             }
             else
             {
@@ -490,7 +651,8 @@ namespace EducationApp
                                    DBHelper.IsPlaceholderOrInvalid(inst) ||
                                    DBHelper.IsInvalidSpecialization(specVal) ||
                                    DBHelper.IsPlaceholderOrInvalid(cgpaVal) ||
-                                   DBHelper.IsPlaceholderOrInvalid(grade) ||
+                                   DBHelper.IsPlaceholderOrInvalid(normGrade) ||
+                                   !DBHelper.IsValidGrade(normGrade) ||
                                    DBHelper.IsPlaceholderOrInvalid(yr);
 
             if (hasPlaceholders)
@@ -504,23 +666,28 @@ namespace EducationApp
                 pnlFormError.Visible = false;
             }
             pnlModal.Style["display"] = "flex";
+            hfModalOpen.Value = "1";
         }
 
         protected void ddlMainQual_SelectedIndexChanged(object sender, EventArgs e)
         {
             // Retained for postback compatibility
             pnlModal.Style["display"] = "flex";
+            hfModalOpen.Value = "1";
         }
 
         protected void ddlCollege_SelectedIndexChanged(object sender, EventArgs e)
         {
             // Retained for postback compatibility
             pnlModal.Style["display"] = "flex";
+            hfModalOpen.Value = "1";
         }
 
         protected void btnCloseModal_Click(object sender, EventArgs e)
         {
             pnlModal.Style["display"] = "none";
+            hfModalOpen.Value = "0";
+            hfEditEduId.Value = "0";
             pnlFormError.Visible = false;
         }
 
@@ -568,14 +735,24 @@ namespace EducationApp
             }
             if (string.IsNullOrEmpty(ddlUniversity.SelectedValue) || DBHelper.IsPlaceholderOrInvalid(ddlUniversity.SelectedValue))
             {
-                ShowFormError("Please select a valid University / Board.");
+                bool isCert = DBHelper.IsCertificateQualification(ddlMainQual.SelectedValue, ddlMainQual.SelectedItem != null ? ddlMainQual.SelectedItem.Text : "");
+                string fieldName = isCert ? "Certifying Body / Issuing Authority" : "University / Board";
+                ShowFormError("Please select a valid " + fieldName + " from the list.");
                 return;
             }
             string college = GetSelectedCollegeName();
             if (string.IsNullOrEmpty(college) || DBHelper.IsPlaceholderOrInvalid(college))
             {
-                ShowFormError("Please select or specify a valid College / School Name.");
-                return;
+                bool isCert = DBHelper.IsCertificateQualification(ddlMainQual.SelectedValue, ddlMainQual.SelectedItem != null ? ddlMainQual.SelectedItem.Text : "");
+                if (isCert)
+                {
+                    college = "Direct Certification / Same as Issuing Authority";
+                }
+                else
+                {
+                    ShowFormError("Please select or specify a valid College / School Name.");
+                    return;
+                }
             }
             string rawScore = txtCgpaMarks.Text.Trim();
             if (string.IsNullOrEmpty(rawScore) || DBHelper.IsPlaceholderOrInvalid(rawScore))
@@ -610,7 +787,9 @@ namespace EducationApp
                 }
             }
 
-            if (string.IsNullOrEmpty(ddlGrade.SelectedValue) || DBHelper.IsPlaceholderOrInvalid(ddlGrade.SelectedValue))
+            string selectedGrade = ddlGrade.SelectedValue;
+            string grade = DBHelper.NormalizeGrade(selectedGrade);
+            if (string.IsNullOrEmpty(grade) || !DBHelper.IsValidGrade(grade))
             {
                 ShowFormError("Please select a valid Grade / Division.");
                 return;
@@ -632,7 +811,6 @@ namespace EducationApp
             int year = Convert.ToInt32(ddlYearPassed.SelectedValue);
             string spec = txtSpecialization.Text.Trim();
             string inst = ddlUniversity.SelectedValue;
-            string grade = ddlGrade.SelectedValue;
             bool isHighest = chkIsHighest.Checked;
             string remarks = txtRemarks.Text.Trim();
             string status = ddlRecordStatus.SelectedValue;
@@ -661,6 +839,9 @@ namespace EducationApp
                     UserSession.CurrentUserName + " (Admin Edit)");
 
                 pnlModal.Style["display"] = "none";
+                hfModalOpen.Value = "0";
+                hfEditEduId.Value = "0";
+                pnlFormError.Visible = false;
                 LoadDashboardStats();
                 BindGrid();
                 ShowAlert("Qualification record for " + Server.HtmlEncode(empName) + " (PCNO: " + pcno + ") successfully updated by Administrator.", "success");
@@ -677,6 +858,16 @@ namespace EducationApp
             pnlFormError.CssClass = "alert alert-danger py-2 small mb-3";
             litFormError.Text = Server.HtmlEncode(msg);
             pnlModal.Style["display"] = "flex";
+            hfModalOpen.Value = "1";
+        }
+
+        protected override void OnPreRender(EventArgs e)
+        {
+            base.OnPreRender(e);
+            if (hfModalOpen.Value != "1")
+            {
+                pnlModal.Style["display"] = "none";
+            }
         }
 
         protected void btnExportCsv_Click(object sender, EventArgs e)
@@ -684,8 +875,9 @@ namespace EducationApp
             string search = txtSearch.Text.Trim();
             string status = ddlStatusFilter.SelectedValue;
             string qual = ddlQualFilter.SelectedValue;
+            string highest = ddlHighestFilter != null ? ddlHighestFilter.SelectedValue : "ALL";
 
-            DataTable dt = DBHelper.GetAdminEducationOverview(search, status, qual, "ALL");
+            DataTable dt = DBHelper.GetAdminEducationOverview(search, status, qual, "ALL", highest);
             if (dt == null || dt.Rows.Count == 0)
             {
                 ShowAlert("No records to export.", "warning");

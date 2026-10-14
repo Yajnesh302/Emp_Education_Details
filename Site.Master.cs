@@ -33,34 +33,6 @@ namespace EducationApp
 
             if (!IsPostBack)
             {
-                string pcno = UserSession.CurrentPCNO ?? "---";
-                litNavPCNO.Text = pcno;
-                litNavUserName.Text = UserSession.CurrentUserName ?? pcno;
-
-                if (imgNavAvatar != null)
-                {
-                    string defaultAvatarUrl = ResolveUrl("~/Static/Images/default_avatar.png");
-                    imgNavAvatar.ImageUrl = defaultAvatarUrl;
-                    imgNavAvatar.Attributes["data-default-avatar"] = defaultAvatarUrl;
-                    imgNavAvatar.Attributes["onerror"] = "if (this.src !== this.getAttribute('data-default-avatar')) { this.src = this.getAttribute('data-default-avatar'); }";
-
-                    bool enableIntranetPhotos = string.Equals(ConfigurationManager.AppSettings["EnableIntranetPhotos"], "true", StringComparison.OrdinalIgnoreCase);
-                    if (enableIntranetPhotos && !string.IsNullOrEmpty(pcno) && pcno != "---")
-                    {
-                        imgNavAvatar.Attributes["data-intranet-photo"] = string.Format("http://windflower.lrde.com/empphotos/Dsc_{0}.jpg", pcno);
-                    }
-                    else
-                    {
-                        imgNavAvatar.Attributes.Remove("data-intranet-photo");
-                    }
-                }
-
-                if (litNavRoleBadge != null)
-                {
-                    string badgeClass = UserSession.IsAdmin ? "badge-warning" : "badge-info";
-                    litNavRoleBadge.Text = string.Format("<span class=\"badge badge-pill {0} ml-1\">{1}</span>", badgeClass, System.Web.HttpUtility.HtmlEncode(UserSession.Role ?? "User"));
-                }
-
                 phAdminNav.Visible = UserSession.IsAdmin;
             }
         }
