@@ -69,6 +69,140 @@
                 border: 1px solid #0284c7;
                 box-shadow: 0 2px 4px rgba(2, 132, 199, 0.25);
             }
+
+            /* Top Pagination Controls */
+            .top-pagination-group {
+                background: #ffffff;
+                border: 1px solid var(--border-color, #e2e8f0);
+                border-radius: 8px;
+                padding: 2px 4px;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+                gap: 2px;
+            }
+
+            .btn-top-page {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                padding: 4px 9px;
+                font-size: 0.8rem;
+                font-weight: 600;
+                color: #475569;
+                background: transparent;
+                border: 1px solid transparent;
+                border-radius: 6px;
+                text-decoration: none !important;
+                transition: all 0.15s ease-in-out;
+                line-height: 1.2;
+            }
+
+            .btn-top-page:hover:not(.disabled) {
+                background-color: #f1f5f9;
+                color: #0284c7;
+                border-color: #cbd5e1;
+            }
+
+            .btn-top-page.disabled,
+            .btn-top-page:disabled {
+                opacity: 0.45;
+                cursor: not-allowed;
+                pointer-events: none;
+                color: #94a3b8;
+            }
+
+            .top-page-indicator {
+                padding: 3px 10px;
+                font-size: 0.8rem;
+                font-weight: 700;
+                color: #0f172a;
+                background: #f8fafc;
+                border-radius: 5px;
+                border: 1px solid #f1f5f9;
+                white-space: nowrap;
+            }
+
+            /* Admin Actions Capsule Bar & Icon Buttons */
+            .admin-actions-bar {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+                padding: 3px 6px;
+                background: #f8fafc;
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+            }
+
+            .btn-admin-act {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 32px;
+                height: 32px;
+                border-radius: 6px;
+                font-size: 0.85rem;
+                text-decoration: none !important;
+                border: 1px solid transparent;
+                transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+                cursor: pointer;
+            }
+
+            /* Edit action button: Soft Sky Blue */
+            .btn-admin-act.act-edit {
+                background-color: #f0f9ff;
+                color: #0284c7;
+                border-color: #bae6fd;
+            }
+            .btn-admin-act.act-edit:hover {
+                background-color: #0284c7;
+                color: #ffffff !important;
+                border-color: #0284c7;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 8px rgba(2, 132, 199, 0.28);
+            }
+
+            /* Revert action button: Soft Warning Amber */
+            .btn-admin-act.act-revert {
+                background-color: #fffbeb;
+                color: #d97706;
+                border-color: #fde68a;
+            }
+            .btn-admin-act.act-revert:hover {
+                background-color: #d97706;
+                color: #ffffff !important;
+                border-color: #d97706;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 8px rgba(217, 119, 6, 0.28);
+            }
+
+            /* Submit action button: Soft Success Emerald */
+            .btn-admin-act.act-submit {
+                background-color: #ecfdf5;
+                color: #059669;
+                border-color: #a7f3d0;
+            }
+            .btn-admin-act.act-submit:hover {
+                background-color: #059669;
+                color: #ffffff !important;
+                border-color: #059669;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 8px rgba(5, 150, 105, 0.28);
+            }
+
+            /* Delete action button: Soft Danger Crimson */
+            .btn-admin-act.act-delete {
+                background-color: #fef2f2;
+                color: #dc2626;
+                border-color: #fecaca;
+            }
+            .btn-admin-act.act-delete:hover {
+                background-color: #dc2626;
+                color: #ffffff !important;
+                border-color: #dc2626;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 8px rgba(220, 38, 38, 0.28);
+            }
         </style>
     </asp:Content>
 
@@ -232,15 +366,37 @@
                                 <asp:Literal ID="litPagingSummary" runat="server">Showing 0 of 0</asp:Literal>
                             </span>
                         </div>
-                        <div class="d-flex align-items-center" style="gap: 8px;">
-                            <span class="small text-muted font-weight-bold">Rows:</span>
-                            <asp:DropDownList ID="ddlPageSize" runat="server" AutoPostBack="true" OnSelectedIndexChanged="ddlPageSize_SelectedIndexChanged" CssClass="form-control form-control-sm" style="width: auto; display: inline-block; font-weight: 600;">
-                                <asp:ListItem Value="25" Selected="True">25 / page</asp:ListItem>
-                                <asp:ListItem Value="50">50 / page</asp:ListItem>
-                                <asp:ListItem Value="100">100 / page</asp:ListItem>
-                                <asp:ListItem Value="200">200 / page</asp:ListItem>
-                                <asp:ListItem Value="999999">Show All</asp:ListItem>
-                            </asp:DropDownList>
+                        <div class="d-flex align-items-center flex-wrap" style="gap: 10px;">
+                            <div class="d-flex align-items-center" style="gap: 6px;">
+                                <span class="small text-muted font-weight-bold">Rows:</span>
+                                <asp:DropDownList ID="ddlPageSize" runat="server" AutoPostBack="true" OnSelectedIndexChanged="ddlPageSize_SelectedIndexChanged" CssClass="form-control form-control-sm" style="width: auto; display: inline-block; font-weight: 600;">
+                                    <asp:ListItem Value="10">10 / page</asp:ListItem>
+                                    <asp:ListItem Value="25" Selected="True">25 / page</asp:ListItem>
+                                    <asp:ListItem Value="50">50 / page</asp:ListItem>
+                                    <asp:ListItem Value="100">100 / page</asp:ListItem>
+                                    <asp:ListItem Value="200">200 / page</asp:ListItem>
+                                    <asp:ListItem Value="999999">Show All</asp:ListItem>
+                                </asp:DropDownList>
+                            </div>
+
+                            <!-- Top Pagination Quick Controls with Arrow Navigation -->
+                            <asp:Panel ID="pnlTopPaging" runat="server" CssClass="top-pagination-group d-inline-flex align-items-center">
+                                <asp:LinkButton ID="btnTopFirst" runat="server" CssClass="btn-top-page" OnClick="btnTopFirst_Click" ToolTip="First Page">
+                                    <i class="fas fa-angle-double-left"></i>
+                                </asp:LinkButton>
+                                <asp:LinkButton ID="btnTopPrev" runat="server" CssClass="btn-top-page" OnClick="btnTopPrev_Click" ToolTip="Previous Page">
+                                    <i class="fas fa-chevron-left"></i> <span class="d-none d-sm-inline ml-1">Prev</span>
+                                </asp:LinkButton>
+                                <span class="top-page-indicator">
+                                    <asp:Literal ID="litTopPageIndicator" runat="server">Page 1 of 1</asp:Literal>
+                                </span>
+                                <asp:LinkButton ID="btnTopNext" runat="server" CssClass="btn-top-page" OnClick="btnTopNext_Click" ToolTip="Next Page">
+                                    <span class="d-none d-sm-inline mr-1">Next</span> <i class="fas fa-chevron-right"></i>
+                                </asp:LinkButton>
+                                <asp:LinkButton ID="btnTopLast" runat="server" CssClass="btn-top-page" OnClick="btnTopLast_Click" ToolTip="Last Page">
+                                    <i class="fas fa-angle-double-right"></i>
+                                </asp:LinkButton>
+                            </asp:Panel>
                         </div>
                     </div>
                     <div class="edu-card-body p-0">
@@ -334,16 +490,15 @@
                                         </ItemTemplate>
                                     </asp:TemplateField>
 
-                                    <asp:TemplateField HeaderText="Admin Actions" ItemStyle-Width="180px"
-                                        ItemStyle-HorizontalAlign="Center">
+                                    <asp:TemplateField HeaderText="Admin Actions" HeaderStyle-Width="130px" ItemStyle-Width="130px"
+                                        ItemStyle-HorizontalAlign="Center" HeaderStyle-HorizontalAlign="Center">
                                         <ItemTemplate>
-                                            <div class="d-inline-flex align-items-center flex-wrap"
-                                                style="gap: 6px; justify-content: center;">
+                                            <div class="admin-actions-bar">
                                                 <asp:LinkButton ID="btnEditRecord" runat="server"
                                                     CommandName="EditRecord" CommandArgument='<%# Eval("EDU_ID") %>'
-                                                    CssClass="btn btn-sm btn-primary font-weight-bold px-2 py-1 shadow-xs"
-                                                    ToolTip="Edit this qualification record directly on dashboard">
-                                                    <i class="fas fa-edit mr-1"></i> Edit
+                                                    CssClass="btn-admin-act act-edit"
+                                                    ToolTip="Edit Qualification Record">
+                                                    <i class="fas fa-pencil-alt"></i>
                                                 </asp:LinkButton>
 
                                                 <asp:PlaceHolder ID="phRevert" runat="server"
@@ -351,13 +506,13 @@
                                                     <asp:LinkButton ID="btnRevertDraft" runat="server"
                                                         CommandName="RevertToDraft"
                                                         CommandArgument='<%# Eval("EDU_ID") %>'
-                                                        CssClass="btn btn-sm btn-outline-warning font-weight-bold px-2 py-1"
-                                                        ToolTip="Unlock record and revert to Draft"
+                                                        CssClass="btn-admin-act act-revert"
+                                                        ToolTip="Unlock & Revert to Draft"
                                                         data-confirm="Unlock this qualification record and revert it to Draft mode? The employee will be able to edit and re-submit it."
                                                         data-confirm-title="Revert Record to Draft"
                                                         data-confirm-type="warning"
                                                         data-confirm-btn="Yes, Revert to Draft">
-                                                        <i class="fas fa-unlock mr-1"></i> Revert
+                                                        <i class="fas fa-unlock-alt"></i>
                                                     </asp:LinkButton>
                                                 </asp:PlaceHolder>
 
@@ -366,15 +521,27 @@
                                                     <asp:LinkButton ID="btnSubmitDraft" runat="server"
                                                         CommandName="SubmitToFinal"
                                                         CommandArgument='<%# Eval("EDU_ID") %>'
-                                                        CssClass="btn btn-sm btn-outline-success font-weight-bold px-2 py-1"
-                                                        ToolTip="Mark record as Submitted and lock"
+                                                        CssClass="btn-admin-act act-submit"
+                                                        ToolTip="Lock as Submitted"
                                                         data-confirm="Lock this record as Submitted? The record will become an official locked entry."
                                                         data-confirm-title="Lock Record as Submitted"
                                                         data-confirm-type="success"
                                                         data-confirm-btn="Yes, Lock as Submitted">
-                                                        <i class="fas fa-lock mr-1"></i> Submit
+                                                        <i class="fas fa-lock"></i>
                                                     </asp:LinkButton>
                                                 </asp:PlaceHolder>
+
+                                                <asp:LinkButton ID="btnDeleteRecord" runat="server"
+                                                    CommandName="DeleteRecord"
+                                                    CommandArgument='<%# Eval("EDU_ID") %>'
+                                                    CssClass="btn-admin-act act-delete"
+                                                    ToolTip="Permanently Delete Record"
+                                                    data-confirm='<%# "Are you sure you want to permanently delete this qualification record for " + Eval("EMP_NAME") + " (PCNO: " + Eval("PCNO") + ")? This action cannot be undone." %>'
+                                                    data-confirm-title="Delete Qualification Record"
+                                                    data-confirm-type="danger"
+                                                    data-confirm-btn="Yes, Delete Record">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </asp:LinkButton>
                                             </div>
                                         </ItemTemplate>
                                     </asp:TemplateField>
@@ -538,17 +705,16 @@
                                         <div class="input-group">
                                             <div class="input-group-prepend">
                                                 <asp:DropDownList ID="ddlScoreType" runat="server"
-                                                    CssClass="form-control form-control-custom"
-                                                    style="width: 140px; border-top-right-radius: 0; border-bottom-right-radius: 0; background-color: #f8fafc; font-weight: 600; color: #1e293b;">
-                                                    <asp:ListItem Value="Percentage" Selected="True">Percentage (%)
-                                                    </asp:ListItem>
+                                                    CssClass="form-control form-control-custom score-type-select"
+                                                    style="width: 145px; height: 42px; padding: 0.35rem 0.65rem; line-height: normal; border-top-right-radius: 0; border-bottom-right-radius: 0; background-color: #f8fafc; font-weight: 600; color: #1e293b;">
+                                                    <asp:ListItem Value="Percentage" Selected="True">Percentage (%)</asp:ListItem>
                                                     <asp:ListItem Value="CGPA">CGPA (10 pt)</asp:ListItem>
                                                     <asp:ListItem Value="Marks">Marks / Total</asp:ListItem>
                                                 </asp:DropDownList>
                                             </div>
                                             <asp:TextBox ID="txtCgpaMarks" runat="server"
                                                 CssClass="form-control form-control-custom" placeholder="e.g. 78.50%"
-                                                style="border-top-left-radius: 0; border-bottom-left-radius: 0;">
+                                                style="height: 42px; border-top-left-radius: 0; border-bottom-left-radius: 0;">
                                             </asp:TextBox>
                                         </div>
                                         <small class="form-text text-muted mt-1" id="scoreHelpText">
@@ -564,8 +730,7 @@
                                         <asp:DropDownList ID="ddlGrade" runat="server"
                                             CssClass="form-control form-control-custom searchable-select">
                                             <asp:ListItem Value="">-- Select Grade / Division --</asp:ListItem>
-                                            <asp:ListItem Value="First Class with Distinction">First Class with
-                                                Distinction</asp:ListItem>
+                                            <asp:ListItem Value="First Class with Distinction">First Class with Distinction</asp:ListItem>
                                             <asp:ListItem Value="First Class">First Class</asp:ListItem>
                                             <asp:ListItem Value="Second Class">Second Class</asp:ListItem>
                                             <asp:ListItem Value="Pass Class">Pass Class</asp:ListItem>
@@ -586,8 +751,7 @@
                                         <asp:DropDownList ID="ddlRecordStatus" runat="server"
                                             CssClass="form-control form-control-custom">
                                             <asp:ListItem Value="Draft">Draft (Editable)</asp:ListItem>
-                                            <asp:ListItem Value="Submitted">Submitted (Locked Official Entry)
-                                            </asp:ListItem>
+                                            <asp:ListItem Value="Submitted">Submitted (Locked Official Entry)</asp:ListItem>
                                         </asp:DropDownList>
                                         <small class="form-text text-muted mt-1"><i
                                                 class="fas fa-info-circle mr-1 text-primary"></i> Administrators can
@@ -628,11 +792,21 @@
 
                             <div class="modal-footer bg-light py-3 px-4 d-flex justify-content-between align-items-center"
                                 style="border-top: 1.5px solid #e2e8f0;">
-                                <div>
+                                <div class="d-flex align-items-center" style="gap: 8px;">
                                     <asp:Button ID="btnCancelModal" runat="server" Text="Cancel"
                                         CssClass="btn btn-edu-outline px-3"
                                         OnClientClick="EduApp.closeModal(); return false;" OnClick="btnCloseModal_Click"
                                         CausesValidation="false" />
+                                    <asp:LinkButton ID="btnDeleteFromModal" runat="server"
+                                        CssClass="btn btn-outline-danger font-weight-bold px-3"
+                                        OnClick="btnDeleteFromModal_Click"
+                                        CausesValidation="false"
+                                        data-confirm="Are you sure you want to permanently delete this qualification record? This action cannot be undone."
+                                        data-confirm-title="Delete Qualification Record"
+                                        data-confirm-type="danger"
+                                        data-confirm-btn="Yes, Delete Record">
+                                        <i class="fas fa-trash-alt mr-1"></i> Delete Record
+                                    </asp:LinkButton>
                                 </div>
                                 <div class="d-flex align-items-center" style="gap: 10px;">
                                     <asp:Button ID="btnSaveAdminEdit" runat="server" Text="Save Changes"

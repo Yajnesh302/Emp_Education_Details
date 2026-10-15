@@ -5,6 +5,8 @@ namespace EducationApp {
         protected global::System.Web.UI.ScriptManager smMasterData;
         protected global::System.Web.UI.UpdatePanel upMasterData;
         protected global::System.Web.UI.WebControls.HiddenField hfActiveTab;
+        protected global::System.Web.UI.WebControls.HiddenField hfSearchState;
+        protected global::System.Web.UI.WebControls.HiddenField hfLastUpdatedKey;
         protected global::System.Web.UI.WebControls.TextBox txtMainCode;
         protected global::System.Web.UI.WebControls.TextBox txtMainName;
         protected global::System.Web.UI.WebControls.DropDownList ddlMainCategory;

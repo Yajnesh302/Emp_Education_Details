@@ -327,6 +327,7 @@ namespace EducationApp
                 bool updated = DBHelper.UpdateMainQualification(code, name, cat);
                 if (updated)
                 {
+                    hfLastUpdatedKey.Value = code;
                     CloseAllModals();
                     LoadAllMasterData();
                     ShowAlert("Main qualification '" + code + "' updated successfully.", "success");
@@ -429,6 +430,7 @@ namespace EducationApp
                 bool updated = DBHelper.UpdateSubQualification(subId, parentMain, code, name);
                 if (updated)
                 {
+                    hfLastUpdatedKey.Value = subId.ToString();
                     CloseAllModals();
                     LoadAllMasterData();
                     ShowAlert("Sub qualification '" + code + "' updated successfully.", "success");
@@ -522,6 +524,7 @@ namespace EducationApp
                 bool updated = DBHelper.UpdateUniversity(univId, name, type);
                 if (updated)
                 {
+                    hfLastUpdatedKey.Value = univId.ToString();
                     CloseAllModals();
                     LoadAllMasterData();
                     ShowAlert("University '" + name + "' updated successfully.", "success");
@@ -627,6 +630,7 @@ namespace EducationApp
                 bool updated = DBHelper.UpdateCollege(collegeId, name, type, loc, affil);
                 if (updated)
                 {
+                    hfLastUpdatedKey.Value = collegeId.ToString();
                     CloseAllModals();
                     LoadAllMasterData();
                     ShowAlert("College / School '" + name + "' updated successfully.", "success");
@@ -720,6 +724,7 @@ namespace EducationApp
                 bool updated = DBHelper.UpdateSubject(subjId, name, group);
                 if (updated)
                 {
+                    hfLastUpdatedKey.Value = subjId.ToString();
                     CloseAllModals();
                     LoadAllMasterData();
                     ShowAlert("Subject '" + name + "' updated successfully.", "success");
@@ -766,6 +771,7 @@ namespace EducationApp
                     }
 
                     DBHelper.ToggleAdminUser(pcno, !currentActive);
+                    hfLastUpdatedKey.Value = pcno;
                     LoadAllMasterData();
                     ShowAlert("Admin privilege for PCNO " + pcno + " updated.", "success");
                 }
@@ -848,6 +854,7 @@ namespace EducationApp
                 bool updated = DBHelper.UpdateAdminUser(pcno, name, role);
                 if (updated)
                 {
+                    hfLastUpdatedKey.Value = pcno;
                     CloseAllModals();
                     LoadAllMasterData();
                     ShowAlert("Administrator " + pcno + " updated successfully.", "success");

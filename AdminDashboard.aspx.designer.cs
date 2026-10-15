@@ -18,6 +18,12 @@ namespace EducationApp {
         protected global::System.Web.UI.WebControls.Literal litFilteredCount;
         protected global::System.Web.UI.WebControls.Literal litPagingSummary;
         protected global::System.Web.UI.WebControls.DropDownList ddlPageSize;
+        protected global::System.Web.UI.WebControls.Panel pnlTopPaging;
+        protected global::System.Web.UI.WebControls.LinkButton btnTopFirst;
+        protected global::System.Web.UI.WebControls.LinkButton btnTopPrev;
+        protected global::System.Web.UI.WebControls.Literal litTopPageIndicator;
+        protected global::System.Web.UI.WebControls.LinkButton btnTopNext;
+        protected global::System.Web.UI.WebControls.LinkButton btnTopLast;
         protected global::System.Web.UI.WebControls.GridView gvAdminEducation;
 
         // In-Page Admin Edit Modal Controls
@@ -53,6 +59,7 @@ namespace EducationApp {
         protected global::System.Web.UI.WebControls.CheckBox chkIsHighest;
         protected global::System.Web.UI.WebControls.TextBox txtRemarks;
         protected global::System.Web.UI.WebControls.Button btnCancelModal;
+        protected global::System.Web.UI.WebControls.LinkButton btnDeleteFromModal;
         protected global::System.Web.UI.WebControls.Button btnSaveAdminEdit;
     }
 }

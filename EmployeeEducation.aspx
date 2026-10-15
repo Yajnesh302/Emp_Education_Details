@@ -94,6 +94,103 @@
         .custom-modal-close:hover {
             color: #0f172a;
         }
+
+        /* Action Capsule Bar & Action Icon Buttons */
+        .admin-actions-bar {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 3px 6px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+        }
+
+        .btn-admin-act {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            text-decoration: none !important;
+            border: 1px solid transparent;
+            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+            cursor: pointer;
+        }
+
+        /* Edit action button: Soft Sky Blue */
+        .btn-admin-act.act-edit {
+            background-color: #f0f9ff;
+            color: #0284c7;
+            border-color: #bae6fd;
+        }
+        .btn-admin-act.act-edit:hover {
+            background-color: #0284c7;
+            color: #ffffff !important;
+            border-color: #0284c7;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(2, 132, 199, 0.28);
+        }
+
+        /* Revert action button: Soft Warning Amber */
+        .btn-admin-act.act-revert {
+            background-color: #fffbeb;
+            color: #d97706;
+            border-color: #fde68a;
+        }
+        .btn-admin-act.act-revert:hover {
+            background-color: #d97706;
+            color: #ffffff !important;
+            border-color: #d97706;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(217, 119, 6, 0.28);
+        }
+
+        /* Submit action button: Soft Success Emerald */
+        .btn-admin-act.act-submit {
+            background-color: #ecfdf5;
+            color: #059669;
+            border-color: #a7f3d0;
+        }
+        .btn-admin-act.act-submit:hover {
+            background-color: #059669;
+            color: #ffffff !important;
+            border-color: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(5, 150, 105, 0.28);
+        }
+
+        /* Delete action button: Soft Danger Crimson */
+        .btn-admin-act.act-delete {
+            background-color: #fef2f2;
+            color: #dc2626;
+            border-color: #fecaca;
+        }
+        .btn-admin-act.act-delete:hover {
+            background-color: #dc2626;
+            color: #ffffff !important;
+            border-color: #dc2626;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(220, 38, 38, 0.28);
+        }
+
+        /* Locked Status Badge */
+        .badge-locked {
+            background-color: #f1f5f9;
+            color: #64748b;
+            border: 1px solid #cbd5e1;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            letter-spacing: 0.3px;
+        }
     </style>
 </asp:Content>
 
@@ -328,43 +425,50 @@
                             </ItemTemplate>
                         </asp:TemplateField>
 
-                        <asp:TemplateField HeaderText="Actions" ItemStyle-Width="125px" ItemStyle-HorizontalAlign="Center" HeaderStyle-HorizontalAlign="Center">
+                        <asp:TemplateField HeaderText="Actions" HeaderStyle-Width="120px" ItemStyle-Width="120px"
+                            ItemStyle-HorizontalAlign="Center" HeaderStyle-HorizontalAlign="Center">
                             <ItemTemplate>
-                                <div class="d-inline-flex align-items-center">
-                                    <asp:PlaceHolder ID="phActions" runat="server" Visible='<%# CanEditRecord(Eval("STATUS")) %>'>
-                                        <asp:LinkButton ID="btnEdit" runat="server" CommandName="EditRecord" CommandArgument='<%# Eval("EDU_ID") %>' CssClass="btn btn-sm btn-outline-primary mr-1" ToolTip="Edit Record">
-                                            <i class="fas fa-edit"></i>
+                                <asp:PlaceHolder ID="phActions" runat="server" Visible='<%# CanEditRecord(Eval("STATUS")) %>'>
+                                    <div class="admin-actions-bar">
+                                        <asp:LinkButton ID="btnEdit" runat="server" CommandName="EditRecord" CommandArgument='<%# Eval("EDU_ID") %>'
+                                            CssClass="btn-admin-act act-edit" ToolTip="Edit Qualification Record">
+                                            <i class="fas fa-pencil-alt"></i>
                                         </asp:LinkButton>
-                                        <asp:LinkButton ID="btnDelete" runat="server" CommandName="DeleteRecord" CommandArgument='<%# Eval("EDU_ID") %>' CssClass="btn btn-sm btn-outline-danger mr-1" ToolTip="Delete Record"
-                                            data-confirm="Are you sure you want to permanently delete this qualification record? This action cannot be undone."
+                                        <asp:PlaceHolder ID="phAdminRevert" runat="server" Visible='<%# UserSession.IsAdmin && Eval("STATUS").ToString() == "Submitted" %>'>
+                                            <asp:LinkButton ID="btnAdminRevert" runat="server" CommandName="AdminRevert" CommandArgument='<%# Eval("EDU_ID") %>'
+                                                CssClass="btn-admin-act act-revert" ToolTip="Admin: Revert to Draft (Unlock)"
+                                                data-confirm="Revert this record to Draft mode? The employee will be able to edit and re-submit it."
+                                                data-confirm-title="Revert Record to Draft"
+                                                data-confirm-type="warning"
+                                                data-confirm-btn="Yes, Revert to Draft">
+                                                <i class="fas fa-unlock-alt"></i>
+                                            </asp:LinkButton>
+                                        </asp:PlaceHolder>
+                                        <asp:PlaceHolder ID="phAdminSubmit" runat="server" Visible='<%# UserSession.IsAdmin && Eval("STATUS").ToString() == "Draft" %>'>
+                                            <asp:LinkButton ID="btnAdminSubmit" runat="server" CommandName="AdminSubmit" CommandArgument='<%# Eval("EDU_ID") %>'
+                                                CssClass="btn-admin-act act-submit" ToolTip="Admin: Mark as Submitted and lock"
+                                                data-confirm="Lock this record as Submitted? The record will become an official locked entry."
+                                                data-confirm-title="Lock Record as Submitted"
+                                                data-confirm-type="success"
+                                                data-confirm-btn="Yes, Lock Record">
+                                                <i class="fas fa-lock"></i>
+                                            </asp:LinkButton>
+                                        </asp:PlaceHolder>
+                                        <asp:LinkButton ID="btnDelete" runat="server" CommandName="DeleteRecord" CommandArgument='<%# Eval("EDU_ID") %>'
+                                            CssClass="btn-admin-act act-delete" ToolTip="Permanently Delete Qualification Record"
+                                            data-confirm='<%# "Are you sure you want to permanently delete this qualification record (" + Eval("QUAL_MAIN_NAME") + ")? This action cannot be undone." %>'
                                             data-confirm-title="Delete Qualification Record"
                                             data-confirm-type="danger"
                                             data-confirm-btn="Yes, Delete Record">
                                             <i class="fas fa-trash-alt"></i>
                                         </asp:LinkButton>
-                                    </asp:PlaceHolder>
-                                    <asp:PlaceHolder ID="phAdminRevert" runat="server" Visible='<%# UserSession.IsAdmin && Eval("STATUS").ToString() == "Submitted" %>'>
-                                        <asp:LinkButton ID="btnAdminRevert" runat="server" CommandName="AdminRevert" CommandArgument='<%# Eval("EDU_ID") %>' CssClass="btn btn-sm btn-outline-warning mr-1" ToolTip="Admin: Revert to Draft"
-                                            data-confirm="Revert this record to Draft mode? The employee will be able to edit and re-submit it."
-                                            data-confirm-title="Revert Record to Draft"
-                                            data-confirm-type="warning"
-                                            data-confirm-btn="Yes, Revert to Draft">
-                                            <i class="fas fa-unlock"></i>
-                                        </asp:LinkButton>
-                                    </asp:PlaceHolder>
-                                    <asp:PlaceHolder ID="phAdminSubmit" runat="server" Visible='<%# UserSession.IsAdmin && Eval("STATUS").ToString() == "Draft" %>'>
-                                        <asp:LinkButton ID="btnAdminSubmit" runat="server" CommandName="AdminSubmit" CommandArgument='<%# Eval("EDU_ID") %>' CssClass="btn btn-sm btn-outline-success mr-1" ToolTip="Admin: Mark as Submitted and lock"
-                                            data-confirm="Lock this record as Submitted? The record will become an official locked entry."
-                                            data-confirm-title="Lock Record as Submitted"
-                                            data-confirm-type="success"
-                                            data-confirm-btn="Yes, Lock Record">
-                                            <i class="fas fa-lock"></i>
-                                        </asp:LinkButton>
-                                    </asp:PlaceHolder>
-                                    <asp:PlaceHolder ID="phLockedView" runat="server" Visible='<%# IsLockedRecord(Eval("STATUS")) %>'>
-                                        <span class="badge badge-light border text-muted px-2 py-1"><i class="fas fa-lock mr-1 text-secondary"></i> Locked</span>
-                                    </asp:PlaceHolder>
-                                </div>
+                                    </div>
+                                </asp:PlaceHolder>
+                                <asp:PlaceHolder ID="phLockedView" runat="server" Visible='<%# IsLockedRecord(Eval("STATUS")) %>'>
+                                    <span class="badge-status badge-locked" title="Officially submitted qualification records are locked from editing">
+                                        <i class="fas fa-lock mr-1 text-muted"></i> Locked
+                                    </span>
+                                </asp:PlaceHolder>
                             </ItemTemplate>
                         </asp:TemplateField>
                     </Columns>
@@ -477,13 +581,13 @@
                                 <label class="form-label-custom">Score Type &amp; Value <span class="req">*</span></label>
                                 <div class="input-group">
                                     <div class="input-group-prepend">
-                                        <asp:DropDownList ID="ddlScoreType" runat="server" CssClass="form-control form-control-custom" style="width: 140px; border-top-right-radius: 0; border-bottom-right-radius: 0; background-color: #f8fafc; font-weight: 600; color: #1e293b;">
+                                        <asp:DropDownList ID="ddlScoreType" runat="server" CssClass="form-control form-control-custom score-type-select" style="width: 145px; height: 42px; padding: 0.35rem 0.65rem; line-height: normal; border-top-right-radius: 0; border-bottom-right-radius: 0; background-color: #f8fafc; font-weight: 600; color: #1e293b;">
                                             <asp:ListItem Value="Percentage" Selected="True">Percentage (%)</asp:ListItem>
                                             <asp:ListItem Value="CGPA">CGPA (10 pt)</asp:ListItem>
                                             <asp:ListItem Value="Marks">Marks / Total</asp:ListItem>
                                         </asp:DropDownList>
                                     </div>
-                                    <asp:TextBox ID="txtCgpaMarks" runat="server" CssClass="form-control form-control-custom" placeholder="e.g. 78.50%" style="border-top-left-radius: 0; border-bottom-left-radius: 0;"></asp:TextBox>
+                                    <asp:TextBox ID="txtCgpaMarks" runat="server" CssClass="form-control form-control-custom" placeholder="e.g. 78.50%" style="height: 42px; border-top-left-radius: 0; border-bottom-left-radius: 0;"></asp:TextBox>
                                 </div>
                                 <small class="form-text text-muted mt-1" id="scoreHelpText">
                                     <i class="fas fa-info-circle mr-1 text-primary"></i> Legacy records may be CGPA or % (e.g. <strong>78.5%</strong> or <strong>8.45 CGPA</strong>).

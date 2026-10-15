@@ -230,7 +230,7 @@
     </style>
 </head>
 <body>
-    <form id="form1" runat="server">
+    <form id="form1" runat="server" defaultbutton="btnLogin">
         <div class="login-wrapper">
             <div class="login-card">
                 <div class="row no-gutters">
@@ -272,7 +272,7 @@
                                 <label class="form-label-bold">Employee PCNO / Username <span class="req">*</span></label>
                                 <div class="input-group-auth d-flex align-items-center">
                                     <span class="input-group-text"><i class="fas fa-id-badge"></i></span>
-                                    <asp:TextBox ID="txtUsername" runat="server" CssClass="form-control" placeholder="Enter your PCNO or Username" autocomplete="username"></asp:TextBox>
+                                    <asp:TextBox ID="txtUsername" runat="server" CssClass="form-control" placeholder="Enter your PCNO or Username" autocomplete="username" autofocus="autofocus"></asp:TextBox>
                                 </div>
                             </div>
 
@@ -310,17 +310,39 @@
     <script src="Static/jquery/jquery.min.js"></script>
     <script>
         $(document).ready(function () {
+            var $usr = $('#<%= txtUsername.ClientID %>');
+            var $pwd = $('#<%= txtPassword.ClientID %>');
+            var $btn = $('#<%= btnLogin.ClientID %>');
+
+            // 1. Automatically place cursor in username field when page loads
+            setTimeout(function () {
+                $usr.focus();
+            }, 60);
+
+            // 2. When Enter is pressed after entering username, navigate to password field
+            $usr.on('keydown', function (e) {
+                if (e.which === 13 || e.keyCode === 13) {
+                    e.preventDefault();
+                    $pwd.focus().select();
+                    return false;
+                }
+            });
+
+            // 3. When Enter is pressed in password field, submit the login form
+            $pwd.on('keydown', function (e) {
+                if (e.which === 13 || e.keyCode === 13) {
+                    e.preventDefault();
+                    $btn.click();
+                    return false;
+                }
+            });
+
             // Password reveal toggle
             $('#btnTogglePassword').on('click', function () {
-                var $pwd = $('#<%= txtPassword.ClientID %>');
-                var $icon = $('#pwdEyeIcon');
-                if ($pwd.attr('type') === 'password') {
-                    $pwd.attr('type', 'text');
-                    $icon.removeClass('fa-eye').addClass('fa-eye-slash');
-                } else {
-                    $pwd.attr('type', 'password');
-                    $icon.removeClass('fa-eye-slash').addClass('fa-eye');
-                }
+                var isPassword = $pwd.attr('type') === 'password';
+                $pwd.attr('type', isPassword ? 'text' : 'password');
+                $('#pwdEyeIcon').toggleClass('fa-eye fa-eye-slash');
+                $pwd.focus();
             });
         });
     </script>

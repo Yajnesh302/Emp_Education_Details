@@ -92,7 +92,8 @@ namespace EducationApp
 
             // Apply selected page size
             int pageSize = 25;
-            if (ddlPageSize != null && int.TryParse(ddlPageSize.SelectedValue, out int ps) && ps > 0)
+            int ps;
+            if (ddlPageSize != null && int.TryParse(ddlPageSize.SelectedValue, out ps) && ps > 0)
             {
                 pageSize = ps;
             }
@@ -117,6 +118,7 @@ namespace EducationApp
             if (totalRecords == 0)
             {
                 litPagingSummary.Text = "No records found";
+                pnlTopPaging.Visible = false;
             }
             else
             {
@@ -125,16 +127,70 @@ namespace EducationApp
                 int totalPages = (int)Math.Ceiling((double)totalRecords / pageSize);
                 int currentPage = gvAdminEducation.PageIndex + 1;
                 litPagingSummary.Text = $"Showing {startRow:N0} - {endRow:N0} of {totalRecords:N0} (Page {currentPage} of {totalPages})";
+
+                // Update Top Paging Controls
+                litTopPageIndicator.Text = $"Page {currentPage} of {Math.Max(1, totalPages)}";
+                bool hasPrev = gvAdminEducation.PageIndex > 0;
+                bool hasNext = gvAdminEducation.PageIndex < totalPages - 1;
+
+                btnTopFirst.Enabled = hasPrev;
+                btnTopFirst.CssClass = hasPrev ? "btn-top-page" : "btn-top-page disabled";
+
+                btnTopPrev.Enabled = hasPrev;
+                btnTopPrev.CssClass = hasPrev ? "btn-top-page" : "btn-top-page disabled";
+
+                btnTopNext.Enabled = hasNext;
+                btnTopNext.CssClass = hasNext ? "btn-top-page" : "btn-top-page disabled";
+
+                btnTopLast.Enabled = hasNext;
+                btnTopLast.CssClass = hasNext ? "btn-top-page" : "btn-top-page disabled";
+
+                pnlTopPaging.Visible = totalPages > 1;
             }
         }
 
-        protected void gvAdminEducation_PageIndexChanging(object sender, GridViewPageEventArgs e)
+        protected void btnTopFirst_Click(object sender, EventArgs e)
+        {
+            CloseModalState();
+            gvAdminEducation.PageIndex = 0;
+            BindGrid();
+        }
+
+        protected void btnTopPrev_Click(object sender, EventArgs e)
+        {
+            CloseModalState();
+            if (gvAdminEducation.PageIndex > 0)
+            {
+                gvAdminEducation.PageIndex--;
+                BindGrid();
+            }
+        }
+
+        protected void btnTopNext_Click(object sender, EventArgs e)
+        {
+            CloseModalState();
+            gvAdminEducation.PageIndex++;
+            BindGrid();
+        }
+
+        protected void btnTopLast_Click(object sender, EventArgs e)
+        {
+            CloseModalState();
+            gvAdminEducation.PageIndex = int.MaxValue;
+            BindGrid();
+        }
+
+        private void CloseModalState()
         {
             pnlModal.Style["display"] = "none";
             hfModalOpen.Value = "0";
             hfEditEduId.Value = "0";
             pnlFormError.Visible = false;
+        }
 
+        protected void gvAdminEducation_PageIndexChanging(object sender, GridViewPageEventArgs e)
+        {
+            CloseModalState();
             gvAdminEducation.PageIndex = e.NewPageIndex;
             BindGrid();
         }
@@ -237,6 +293,12 @@ namespace EducationApp
                 {
                     ShowAlert("Error submitting record: " + ex.Message, "danger");
                 }
+            }
+            else if (e.CommandName == "DeleteRecord")
+            {
+                CloseModalState();
+                int eduId = Convert.ToInt32(e.CommandArgument);
+                ExecuteDelete(eduId);
             }
         }
 
@@ -689,6 +751,54 @@ namespace EducationApp
             hfModalOpen.Value = "0";
             hfEditEduId.Value = "0";
             pnlFormError.Visible = false;
+        }
+
+        protected void btnDeleteFromModal_Click(object sender, EventArgs e)
+        {
+            int eduId;
+            if (int.TryParse(hfEditEduId.Value, out eduId) && eduId > 0)
+            {
+                CloseModalState();
+                ExecuteDelete(eduId);
+            }
+        }
+
+        private void ExecuteDelete(int eduId)
+        {
+            try
+            {
+                string pcno = "";
+                string empName = "";
+                DataRow r = DBHelper.GetEducationRecordById(eduId);
+                if (r != null)
+                {
+                    if (r["PCNO"] != DBNull.Value)
+                    {
+                        pcno = r["PCNO"].ToString();
+                    }
+                    if (r["EMP_NAME"] != DBNull.Value)
+                    {
+                        empName = r["EMP_NAME"].ToString();
+                    }
+                }
+
+                bool deleted = DBHelper.DeleteEducationRecord(eduId, pcno, UserSession.CurrentUserName, UserSession.IsAdmin);
+                if (deleted)
+                {
+                    LoadDashboardStats();
+                    BindGrid();
+                    string target = !string.IsNullOrEmpty(empName) ? (empName + " (PCNO: " + pcno + ")") : ("Record #" + eduId);
+                    ShowAlert("Qualification record for " + Server.HtmlEncode(target) + " was permanently deleted.", "success");
+                }
+                else
+                {
+                    ShowAlert("Could not delete record #" + eduId + ". It may have already been removed.", "danger");
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowAlert("Error deleting record: " + ex.Message, "danger");
+            }
         }
 
         protected void btnSaveAdminEdit_Click(object sender, EventArgs e)

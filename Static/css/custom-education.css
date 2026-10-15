@@ -698,7 +698,8 @@ body {
 .form-control-custom {
     display: block;
     width: 100%;
-    padding: 0.55rem 0.85rem;
+    height: 42px;
+    padding: 0.45rem 0.85rem;
     font-size: 0.9rem;
     font-weight: 400;
     line-height: 1.5;
@@ -708,6 +709,52 @@ body {
     border: 1.5px solid #cbd5e1;
     border-radius: 8px;
     transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    box-sizing: border-box;
+}
+
+/* Ensure native select elements have vertically centered text and do not clip descenders */
+select.form-control-custom,
+select.form-control {
+    height: 42px !important;
+    line-height: 1.4 !important;
+    padding-top: 0.35rem !important;
+    padding-bottom: 0.35rem !important;
+    padding-left: 0.75rem !important;
+    vertical-align: middle !important;
+    box-sizing: border-box !important;
+}
+
+/* Specific styling for score type select dropdown */
+.score-type-select,
+select[id$="ddlScoreType"] {
+    height: 42px !important;
+    line-height: 1.4 !important;
+    padding-top: 0.35rem !important;
+    padding-bottom: 0.35rem !important;
+    padding-left: 0.65rem !important;
+    padding-right: 0.65rem !important;
+    vertical-align: middle !important;
+    box-sizing: border-box !important;
+    display: inline-block !important;
+}
+
+/* Input group alignment */
+.input-group .form-control-custom,
+.input-group-prepend .form-control-custom,
+.input-group-append .form-control-custom {
+    height: 42px !important;
+}
+
+.input-group-prepend select.form-control-custom,
+.input-group-prepend .score-type-select {
+    height: 42px !important;
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+}
+
+textarea.form-control-custom {
+    height: auto !important;
+    min-height: 70px;
 }
 
 .form-control-custom:focus {
@@ -868,7 +915,9 @@ body {
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    padding: 0.55rem 0.85rem;
+    height: 42px;
+    min-height: 42px;
+    padding: 0.45rem 0.85rem;
     font-size: 0.9rem;
     background-color: #fff;
     border: 1.5px solid #cbd5e1;
@@ -876,6 +925,7 @@ body {
     cursor: pointer;
     user-select: none;
     transition: all 0.15s ease-in-out;
+    box-sizing: border-box;
 }
 
 .searchable-select-trigger:focus,
@@ -1284,4 +1334,89 @@ body {
         opacity: 1;
         transform: scale(1);
     }
+}
+
+/* ==========================================================================
+   Admin Actions Capsule Bar & Action Icon Buttons
+   ========================================================================== */
+.admin-actions-bar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 3px 6px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.btn-admin-act {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    text-decoration: none !important;
+    border: 1px solid transparent;
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    cursor: pointer;
+}
+
+/* Edit action button: Soft Sky Blue */
+.btn-admin-act.act-edit {
+    background-color: #f0f9ff;
+    color: #0284c7;
+    border-color: #bae6fd;
+}
+.btn-admin-act.act-edit:hover {
+    background-color: #0284c7;
+    color: #ffffff !important;
+    border-color: #0284c7;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(2, 132, 199, 0.28);
+}
+
+/* Revert action button: Soft Warning Amber */
+.btn-admin-act.act-revert {
+    background-color: #fffbeb;
+    color: #d97706;
+    border-color: #fde68a;
+}
+.btn-admin-act.act-revert:hover {
+    background-color: #d97706;
+    color: #ffffff !important;
+    border-color: #d97706;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(217, 119, 6, 0.28);
+}
+
+/* Submit action button: Soft Success Emerald */
+.btn-admin-act.act-submit {
+    background-color: #ecfdf5;
+    color: #059669;
+    border-color: #a7f3d0;
+}
+.btn-admin-act.act-submit:hover {
+    background-color: #059669;
+    color: #ffffff !important;
+    border-color: #059669;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(5, 150, 105, 0.28);
+}
+
+/* Delete action button: Soft Danger Crimson */
+.btn-admin-act.act-delete {
+    background-color: #fef2f2;
+    color: #dc2626;
+    border-color: #fecaca;
+}
+.btn-admin-act.act-delete:hover {
+    background-color: #dc2626;
+    color: #ffffff !important;
+    border-color: #dc2626;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(220, 38, 38, 0.28);
 }

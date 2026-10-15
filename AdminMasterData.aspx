@@ -1,4 +1,4 @@
-<%@ Page Title="Master Data Management" Language="C#" MasterPageFile="~/Site.Master" AutoEventWireup="true" CodeBehind="AdminMasterData.aspx.cs" Inherits="EducationApp.AdminMasterData" %>
+<%@ Page Title="Master Data Management" Language="C#" MasterPageFile="~/Site.Master" AutoEventWireup="true" CodeBehind="AdminMasterData.aspx.cs" Inherits="EducationApp.AdminMasterData" MaintainScrollPositionOnPostback="true" %>
 
 <asp:Content ID="Content1" ContentPlaceHolderID="HeadContent" runat="server">
     <style>
@@ -103,6 +103,26 @@
             box-shadow: 0 3px 8px rgba(217, 119, 6, 0.25);
             transform: translateY(-1px);
         }
+
+        /* Pulsing highlight for freshly updated rows */
+        @keyframes rowUpdatedPulse {
+            0% { background-color: rgba(37, 99, 235, 0.25); }
+            50% { background-color: rgba(37, 99, 235, 0.40); }
+            100% { background-color: transparent; }
+        }
+        .row-updated-highlight {
+            animation: rowUpdatedPulse 2.8s ease-out !important;
+        }
+
+        /* Clear search button interactive feel */
+        .btn-tab-search-clear {
+            transition: all 0.15s ease;
+        }
+        .btn-tab-search-clear:hover {
+            background-color: #fee2e2 !important;
+            color: #dc2626 !important;
+            border-color: #fca5a5 !important;
+        }
     </style>
 </asp:Content>
 
@@ -127,8 +147,10 @@
     <!-- Asynchronous UpdatePanel to Ensure Zero Full Page Reloads -->
     <asp:UpdatePanel ID="upMasterData" runat="server" UpdateMode="Always">
         <ContentTemplate>
-            <!-- Active Tab State HiddenField -->
+            <!-- Active Tab and Search / Scroll Persistence HiddenFields -->
             <asp:HiddenField ID="hfActiveTab" runat="server" Value="#tab-main" />
+            <asp:HiddenField ID="hfSearchState" runat="server" Value="" />
+            <asp:HiddenField ID="hfLastUpdatedKey" runat="server" Value="" />
 
             <!-- Master Tabs -->
             <ul class="nav nav-tabs nav-tabs-custom mb-4" id="masterTabs" role="tablist">
@@ -938,6 +960,56 @@
 
 <asp:Content ID="Content3" ContentPlaceHolderID="ScriptsContent" runat="server">
     <script>
+        // In-memory state tracking to guarantee zero loss across partial postbacks
+        window._masterSearches = window._masterSearches || {};
+        window._masterTableScrolls = window._masterTableScrolls || {};
+        window._masterWindowY = window._masterWindowY || 0;
+        window._isAsyncUpdating = false;
+
+        function saveSearchQuery(inputId, query) {
+            window._masterSearches[inputId] = query;
+            try {
+                sessionStorage.setItem('EduMaster_Search_' + inputId, query);
+                var $hf = $('#<%= hfSearchState.ClientID %>');
+                if ($hf.length) {
+                    $hf.val(JSON.stringify(window._masterSearches));
+                }
+            } catch (e) { }
+        }
+
+        function getSearchQuery(inputId) {
+            if (window._masterSearches[inputId] !== undefined && window._masterSearches[inputId] !== null) {
+                return window._masterSearches[inputId];
+            }
+            try {
+                var stored = sessionStorage.getItem('EduMaster_Search_' + inputId);
+                if (stored !== null && stored !== undefined) {
+                    window._masterSearches[inputId] = stored;
+                    return stored;
+                }
+                var hfVal = $('#<%= hfSearchState.ClientID %>').val();
+                if (hfVal) {
+                    var parsed = JSON.parse(hfVal);
+                    if (parsed && parsed[inputId] !== undefined && parsed[inputId] !== null) {
+                        window._masterSearches[inputId] = parsed[inputId];
+                        return parsed[inputId];
+                    }
+                }
+            } catch (e) { }
+            return '';
+        }
+
+        function clearSearchQuery(inputId) {
+            delete window._masterSearches[inputId];
+            try {
+                sessionStorage.removeItem('EduMaster_Search_' + inputId);
+                var $hf = $('#<%= hfSearchState.ClientID %>');
+                if ($hf.length) {
+                    $hf.val(JSON.stringify(window._masterSearches));
+                }
+            } catch (e) { }
+        }
+
         function switchToTab(targetId) {
             if (!targetId || targetId.charAt(0) !== '#') return;
 
@@ -960,10 +1032,33 @@
             if (window.history && window.history.replaceState) {
                 window.history.replaceState(null, null, targetId);
             }
+
+            // 4. Restore search & scroll for this tab
+            var $input = $targetPane.find('.tab-search-input');
+            if ($input.length) {
+                var inputId = $input.attr('id');
+                var gridId = $input.attr('data-target-grid');
+                var savedQ = getSearchQuery(inputId);
+                if (savedQ && !$input.val()) {
+                    $input.val(savedQ);
+                }
+                filterTable(gridId, $input.val() || savedQ || '');
+            }
+
+            var cleanId = targetId.replace('#', '');
+            if (window._masterTableScrolls[cleanId] > 0) {
+                var $box = $targetPane.find('.table-responsive');
+                if ($box.length) {
+                    $box.scrollTop(window._masterTableScrolls[cleanId]);
+                }
+            }
         }
 
         function filterTable(gridId, query) {
             var $table = $('#' + gridId);
+            if (!$table.length) {
+                $table = $('table[id$="' + gridId.replace('MainContent_', '') + '"]');
+            }
             if (!$table.length) return;
 
             var $tbody = $table.find('tbody');
@@ -974,13 +1069,28 @@
 
             $tbody.find('.tab-search-no-results').remove();
 
+            var terms = cleanQuery ? cleanQuery.split(/\s+/).filter(Boolean) : [];
             var visibleCount = 0;
+
             $rows.each(function () {
                 var $row = $(this);
                 if ($row.find('th').length > 0) return; // Skip table header row
 
-                var text = $row.text().toLowerCase();
-                if (!cleanQuery || text.indexOf(cleanQuery) > -1) {
+                // Search data cells only (excluding the actions column to prevent matches on 'Edit' / 'Delete' text)
+                var $dataCells = $row.find('> td').not(':last-child');
+                var text = ($dataCells.length ? $dataCells.text() : $row.text()).toLowerCase();
+
+                var matches = true;
+                if (terms.length > 0) {
+                    for (var i = 0; i < terms.length; i++) {
+                        if (text.indexOf(terms[i]) === -1) {
+                            matches = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (matches) {
                     $row.show();
                     visibleCount++;
                 } else {
@@ -994,6 +1104,129 @@
             }
         }
 
+        function restoreAllSearches() {
+            // Seed from hidden field if memory is currently empty
+            if ($.isEmptyObject(window._masterSearches)) {
+                try {
+                    var hfVal = $('#<%= hfSearchState.ClientID %>').val();
+                    if (hfVal) {
+                        window._masterSearches = JSON.parse(hfVal);
+                    }
+                } catch (e) { }
+            }
+
+            $('.tab-search-input').each(function () {
+                var $input = $(this);
+                var inputId = $input.attr('id');
+                var gridId = $input.attr('data-target-grid');
+                var savedQuery = getSearchQuery(inputId);
+
+                if (savedQuery) {
+                    $input.val(savedQuery);
+                    filterTable(gridId, savedQuery);
+                } else {
+                    var currentVal = $input.val();
+                    if (currentVal) {
+                        saveSearchQuery(inputId, currentVal);
+                        filterTable(gridId, currentVal);
+                    }
+                }
+            });
+        }
+
+        function snapshotCurrentState() {
+            // 1. Snapshot all search inputs
+            $('.tab-search-input').each(function () {
+                var id = $(this).attr('id');
+                var val = $(this).val();
+                if (val) {
+                    saveSearchQuery(id, val);
+                } else {
+                    clearSearchQuery(id);
+                }
+            });
+
+            // 2. Snapshot window scroll
+            window._masterWindowY = $(window).scrollTop();
+
+            // 3. Snapshot table scroll for active tab
+            var activeTab = $('#<%= hfActiveTab.ClientID %>').val() || '#tab-main';
+            var cleanTab = activeTab.replace('#', '');
+            var $box = $('#' + cleanTab).find('.table-responsive');
+            if ($box.length) {
+                window._masterTableScrolls[cleanTab] = $box.scrollTop();
+            }
+        }
+
+        function restoreScrollPositions() {
+            var activeTab = $('#<%= hfActiveTab.ClientID %>').val() || '#tab-main';
+            var cleanTab = activeTab.replace('#', '');
+            var $box = $('#' + cleanTab).find('.table-responsive');
+            var savedTableScroll = window._masterTableScrolls[cleanTab] || 0;
+            var savedWinScroll = window._masterWindowY || 0;
+
+            if ($box.length && savedTableScroll > 0) {
+                $box.scrollTop(savedTableScroll);
+            }
+            if (savedWinScroll > 0) {
+                window.scrollTo(0, savedWinScroll);
+            }
+
+            // Secondary restore to ensure layout & rendering reflow have fully settled
+            setTimeout(function () {
+                if ($box.length && savedTableScroll > 0) {
+                    $box.scrollTop(savedTableScroll);
+                }
+                if (savedWinScroll > 0) {
+                    window.scrollTo(0, savedWinScroll);
+                }
+            }, 30);
+        }
+
+        function highlightUpdatedRow() {
+            var key = $('#<%= hfLastUpdatedKey.ClientID %>').val();
+            if (!key) return;
+
+            var curTab = $('#<%= hfActiveTab.ClientID %>').val() || '#tab-main';
+            var $pane = $(curTab);
+            var $targetRow = null;
+
+            $pane.find('table tbody tr').each(function () {
+                var $r = $(this);
+                var $btn = $r.find('[id*="btnEdit"]');
+                if ($btn.length) {
+                    var href = $btn.attr('href') || '';
+                    if (href.indexOf("'" + key + "'") > -1 || href.indexOf('"' + key + '"') > -1) {
+                        $targetRow = $r;
+                        return false;
+                    }
+                }
+                var firstCol = $.trim($r.find('td:first').text());
+                if (firstCol === key) {
+                    $targetRow = $r;
+                    return false;
+                }
+            });
+
+            if ($targetRow && $targetRow.length) {
+                $targetRow.addClass('row-updated-highlight');
+                // Scroll row smoothly into view inside table container if it was scrolled out
+                var $container = $pane.find('.table-responsive');
+                if ($container.length && $targetRow.position()) {
+                    var rowTop = $targetRow.position().top;
+                    var containerHeight = $container.height();
+                    if (rowTop < 0 || rowTop > containerHeight) {
+                        $container.scrollTop($container.scrollTop() + rowTop - 40);
+                    }
+                }
+                setTimeout(function () {
+                    $targetRow.removeClass('row-updated-highlight');
+                }, 3000);
+            }
+
+            $('#<%= hfLastUpdatedKey.ClientID %>').val('');
+        }
+
         function initMasterDataUI() {
             EduApp.makeSearchable('#<%= ddlMainCategory.ClientID %>', '-- Select Category / Level --');
             EduApp.makeSearchable('#<%= ddlSubParentMain.ClientID %>', '-- Link to Main Qualification --');
@@ -1005,6 +1238,7 @@
             // Direct delegated click handler for instant tab switching
             $(document).on('click', '#masterTabs a', function (e) {
                 e.preventDefault();
+                snapshotCurrentState();
                 var target = $(this).attr('data-bs-target') || $(this).attr('href');
                 switchToTab(target);
             });
@@ -1016,9 +1250,26 @@
                 }
             });
 
-            // Restore active tab on load
+            // Continuous scroll listener to track current scroll positions
+            $(window).on('scroll', function () {
+                if (!window._isAsyncUpdating) {
+                    window._masterWindowY = $(window).scrollTop();
+                }
+            });
+
+            $(document).on('scroll', '.table-responsive', function () {
+                if (!window._isAsyncUpdating) {
+                    var tabId = $(this).closest('.tab-pane').attr('id');
+                    if (tabId) {
+                        window._masterTableScrolls[tabId] = $(this).scrollTop();
+                    }
+                }
+            });
+
+            // Restore active tab and saved searches on initial load
             var initialTab = window.location.hash || $('#<%= hfActiveTab.ClientID %>').val() || '#tab-main';
             switchToTab(initialTab);
+            restoreAllSearches();
 
             // Tab Search: click Search button
             $(document).on('click', '.btn-tab-search', function (e) {
@@ -1026,6 +1277,11 @@
                 var gridId = $(this).attr('data-target-grid');
                 var inputId = $(this).attr('data-input-id');
                 var q = $('#' + inputId).val();
+                if (q) {
+                    saveSearchQuery(inputId, q);
+                } else {
+                    clearSearchQuery(inputId);
+                }
                 filterTable(gridId, q);
             });
 
@@ -1035,7 +1291,9 @@
                 var gridId = $(this).attr('data-target-grid');
                 var inputId = $(this).attr('data-input-id');
                 $('#' + inputId).val('');
+                clearSearchQuery(inputId);
                 filterTable(gridId, '');
+                $('#' + inputId).focus();
             });
 
             // Tab Search: press Enter in search input
@@ -1043,7 +1301,13 @@
                 if (e.which === 13) {
                     e.preventDefault();
                     var gridId = $(this).attr('data-target-grid');
+                    var inputId = $(this).attr('id');
                     var q = $(this).val();
+                    if (q) {
+                        saveSearchQuery(inputId, q);
+                    } else {
+                        clearSearchQuery(inputId);
+                    }
                     filterTable(gridId, q);
                 }
             });
@@ -1051,26 +1315,81 @@
             // Tab Search: live filtering as user types
             $(document).on('input', '.tab-search-input', function () {
                 var gridId = $(this).attr('data-target-grid');
+                var inputId = $(this).attr('id');
                 var q = $(this).val();
+                if (q) {
+                    saveSearchQuery(inputId, q);
+                } else {
+                    clearSearchQuery(inputId);
+                }
                 filterTable(gridId, q);
+            });
+
+            // Snapshot state on clicking any Edit, Delete, Toggle or Save button
+            $(document).on('click', '.btn-action, input[id*="btnSaveEdit"], input[id*="btnCancelEdit"], a[id*="btnCloseEdit"]', function () {
+                snapshotCurrentState();
+            });
+
+            // Modal ergonomics: Press Enter in edit modal inputs triggers the Update button directly
+            $(document).on('keydown', '.custom-modal-backdrop input[type="text"]', function (e) {
+                if (e.which === 13) {
+                    e.preventDefault();
+                    snapshotCurrentState();
+                    $(this).closest('.custom-modal-content').find('input[id*="btnSaveEdit"]').click();
+                }
+            });
+
+            // Modal ergonomics: Escape key closes any open edit modal
+            $(document).on('keydown', function (e) {
+                if (e.key === 'Escape' || e.which === 27) {
+                    var $openModal = $('.custom-modal-backdrop:visible');
+                    if ($openModal.length) {
+                        snapshotCurrentState();
+                        $openModal.find('input[id*="btnCancelEdit"], a[id*="btnCloseEdit"]').first().click();
+                    }
+                }
+            });
+
+            // Modal ergonomics: Clicking modal backdrop outside the dialog cancels modal
+            $(document).on('click', '.custom-modal-backdrop', function (e) {
+                if (e.target === this) {
+                    snapshotCurrentState();
+                    $(this).find('input[id*="btnCancelEdit"], a[id*="btnCloseEdit"]').first().click();
+                }
             });
         });
 
-        // Re-initialize searchable dropdowns and active tabs seamlessly after every partial AJAX postback
+        // Register PageRequestManager hooks for 100% seamless partial postbacks
         if (typeof Sys !== 'undefined' && Sys.WebForms && Sys.WebForms.PageRequestManager) {
-            Sys.WebForms.PageRequestManager.getInstance().add_endRequest(function () {
+            var prm = Sys.WebForms.PageRequestManager.getInstance();
+
+            prm.add_beginRequest(function (sender, args) {
+                window._isAsyncUpdating = true;
+                snapshotCurrentState();
+            });
+
+            prm.add_endRequest(function (sender, args) {
+                window._isAsyncUpdating = false;
+
                 initMasterDataUI();
+
                 var curTab = $('#<%= hfActiveTab.ClientID %>').val() || '#tab-main';
                 switchToTab(curTab);
 
-                // Re-apply any active searches after partial postback
-                $('.tab-search-input').each(function () {
-                    var q = $(this).val();
-                    var gridId = $(this).attr('data-target-grid');
-                    if (q) {
-                        filterTable(gridId, q);
-                    }
-                });
+                // Restore all search inputs and re-filter tables
+                restoreAllSearches();
+
+                // Restore scroll positions seamlessly
+                restoreScrollPositions();
+
+                // Highlight recently edited row if applicable
+                highlightUpdatedRow();
+
+                // If an edit modal is open, focus its primary editable input
+                var $modalVisible = $('.custom-modal-backdrop:visible');
+                if ($modalVisible.length) {
+                    $modalVisible.find('input[type="text"]:not([readonly]):first').focus();
+                }
             });
         }
     </script>

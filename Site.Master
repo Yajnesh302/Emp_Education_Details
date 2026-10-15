@@ -13,7 +13,7 @@
     <link href="Static/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css" />
     <link href="Static/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
     <link href="Static/css/sb-admin-2.min.css" rel="stylesheet" type="text/css" />
-    <link href="Static/css/custom-education.css?v=20261013_33" rel="stylesheet" type="text/css" />
+    <link href="Static/css/custom-education.css?v=20261015_04" rel="stylesheet" type="text/css" />
 
     <!-- Core Local Offline JS Assets in Head for Guaranteed Early Availability -->
     <script src="Static/jquery/jquery.min.js"></script>

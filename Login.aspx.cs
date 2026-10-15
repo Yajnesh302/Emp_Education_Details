@@ -15,6 +15,10 @@ namespace EducationApp
                 {
                     RedirectByRole();
                 }
+                else
+                {
+                    txtUsername.Focus();
+                }
             }
         }
 

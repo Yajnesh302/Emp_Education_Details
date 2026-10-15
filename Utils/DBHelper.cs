@@ -150,7 +150,7 @@ namespace EducationApp.Utils
                                     COLLEGE_NAME VARCHAR2(250),
                                     SPECIALIZATION VARCHAR2(200) NOT NULL,
                                     CGPA_MARKS VARCHAR2(50) NOT NULL,
-                                    GRADE_DIVISION VARCHAR2(50) NOT NULL,
+                                    GRADE_DIVISION VARCHAR2(50),
                                     IS_HIGHEST NUMBER(1) DEFAULT 0 NOT NULL,
                                     REMARKS VARCHAR2(1000),
                                     STATUS VARCHAR2(20) DEFAULT 'Draft' NOT NULL,
@@ -3880,6 +3880,13 @@ namespace EducationApp.Utils
             try
             {
                 string legTable = GetLegacyEducationTableName();
+
+                // Ensure GRADE_DIVISION is nullable in EDU_EMP_EDUCATION to allow migrating draft/incomplete legacy records
+                try
+                {
+                    ExecuteNonQuery("ALTER TABLE EDU_EMP_EDUCATION MODIFY (GRADE_DIVISION NULL)");
+                }
+                catch { }
 
                 // Fetch legacy records
                 string queryOld = "SELECT PCNO, CTREDN, QFNID, UNIVINSTID, COLLEGENAME, SUBJECTID, YEARPASSED, GRADE, PERCENTAGE, HIGHESTQFN FROM " + legTable + " ORDER BY PCNO, CTREDN";
