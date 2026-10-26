@@ -465,6 +465,40 @@ namespace EducationApp.Utils
 
                             // 16. Ensure NAC, NTC, CC, ITI and LRDE trades are fully populated
                             EnsureVocationalAndApprenticeshipMasterData(conn);
+
+                            // 17. Ensure INSTITUTE_NAME in EDU_EMP_EDUCATION is nullable to permit draft/migrated records with blank university
+                            try
+                            {
+                                ExecuteSql(conn, "ALTER TABLE EDU_EMP_EDUCATION MODIFY (INSTITUTE_NAME NULL)");
+                            }
+                            catch { }
+
+                            // 18. Auto-heal any migrated records where legacy university was '*' or 0 and was incorrectly set to 'Other Recognized University / Board', 'Other', '*', or 'Not Specified'
+                            try
+                            {
+                                string legTable = GetLegacyEducationTableName();
+                                string cleanSql = @"
+                                    UPDATE EDU_EMP_EDUCATION e
+                                    SET e.INSTITUTE_NAME = NULL, e.STATUS = 'Draft'
+                                    WHERE e.IS_MIGRATED = 1
+                                      AND (e.INSTITUTE_NAME = '*' OR e.INSTITUTE_NAME = 'Not Specified' 
+                                           OR e.INSTITUTE_NAME = 'Other Recognized University / Board' 
+                                           OR e.INSTITUTE_NAME = 'Other')
+                                      AND EXISTS (
+                                          SELECT 1 FROM " + legTable + @" h
+                                          WHERE h.PCNO = e.PCNO
+                                            AND h.CTREDN = e.OLD_CTREDN
+                                            AND (h.UNIVINSTID = 0 OR h.UNIVINSTID IS NULL OR TRIM(h.COLLEGENAME) = '*')
+                                      )";
+                                ExecuteSql(conn, cleanSql);
+                            }
+                            catch { }
+
+                            try
+                            {
+                                ExecuteSql(conn, "UPDATE EDU_EMP_EDUCATION SET INSTITUTE_NAME = NULL, STATUS = 'Draft' WHERE TRIM(INSTITUTE_NAME) = '*' OR TRIM(INSTITUTE_NAME) = 'Not Specified'");
+                            }
+                            catch { }
                         }
                         catch { }
                     }
@@ -3261,7 +3295,7 @@ namespace EducationApp.Utils
             if (_legacyUnivMap == null)
             {
                 var legacyMap = new Dictionary<int, string>();
-            legacyMap[0] = "Other Recognized University / Board";
+            // Note: Legacy ID 0 was '*' (dummy/unspecified in HR system). It is intentionally NOT mapped to 'Other' so it remains blank.
             legacyMap[1] = "Anna University, Chennai";
             legacyMap[2] = "Bangalore University, Bengaluru";
             legacyMap[3] = "Andhra University, Visakhapatnam";
@@ -3618,16 +3652,22 @@ namespace EducationApp.Utils
 
         public static string GetCanonicalLegacyUniversity(int uid, string colName)
         {
-            var map = GetLegacyUniversityMap();
-            if (uid >= 0 && map.ContainsKey(uid))
+            // Legacy ID 0 was '*' (dummy placeholder in HR system). It must NOT auto-select as 'Other'; keep blank.
+            if (uid > 0)
             {
-                return map[uid];
+                var map = GetLegacyUniversityMap();
+                if (map.ContainsKey(uid))
+                {
+                    return map[uid];
+                }
             }
+
             if (!string.IsNullOrWhiteSpace(colName) && !IsPlaceholderOrInvalid(colName))
             {
                 return NormalizeUniversityName(colName);
             }
-            return "Not Specified";
+
+            return string.Empty;
         }
 
         public static bool AddUniversity(string name, string stateOrType)
@@ -3881,10 +3921,16 @@ namespace EducationApp.Utils
             {
                 string legTable = GetLegacyEducationTableName();
 
-                // Ensure GRADE_DIVISION is nullable in EDU_EMP_EDUCATION to allow migrating draft/incomplete legacy records
+                // Ensure GRADE_DIVISION and INSTITUTE_NAME are nullable in EDU_EMP_EDUCATION to allow migrating draft/incomplete legacy records
                 try
                 {
                     ExecuteNonQuery("ALTER TABLE EDU_EMP_EDUCATION MODIFY (GRADE_DIVISION NULL)");
+                }
+                catch { }
+
+                try
+                {
+                    ExecuteNonQuery("ALTER TABLE EDU_EMP_EDUCATION MODIFY (INSTITUTE_NAME NULL)");
                 }
                 catch { }
 
@@ -3992,12 +4038,17 @@ namespace EducationApp.Utils
                     }
                     string rawCol = r["COLLEGENAME"] != DBNull.Value ? r["COLLEGENAME"].ToString() : "";
                     string instName = GetCanonicalLegacyUniversity(uid, rawCol);
-                    instName = NormalizeUniversityName(instName);
 
-                    // Ensure university is registered in EDU_UNIVERSITY master table globally for ALL users
-                    if (!IsPlaceholderOrInvalid(instName))
+                    // If legacy university was '*' or dummy/unspecified, keep it blank (do NOT auto-select as Other)
+                    if (!string.IsNullOrWhiteSpace(instName) && !IsPlaceholderOrInvalid(instName))
                     {
+                        instName = NormalizeUniversityName(instName);
+                        // Ensure university is registered in EDU_UNIVERSITY master table globally for ALL users
                         instName = EnsureUniversityExists(instName, "Recognized Institution");
+                    }
+                    else
+                    {
+                        instName = null;
                     }
 
                     // Subject / Specialization resolution
@@ -4030,7 +4081,7 @@ namespace EducationApp.Utils
 
                     // If record contains placeholder values or missing/invalid grade, force to Draft so employee must verify and select proper values
                     string rowStatus = defaultStatus;
-                    if (IsPlaceholderOrInvalid(college) || IsPlaceholderOrInvalid(instName) ||
+                    if (IsPlaceholderOrInvalid(college) || string.IsNullOrWhiteSpace(instName) || IsPlaceholderOrInvalid(instName) ||
                         IsInvalidSpecialization(specName) || string.IsNullOrEmpty(normGrade) || !IsValidGrade(normGrade) ||
                         IsPlaceholderOrInvalid(pct) ||
                         yearPassed < 1950)
@@ -4099,7 +4150,7 @@ namespace EducationApp.Utils
                         new OracleParameter("SC", subCode),
                         new OracleParameter("SN", specName),
                         new OracleParameter("YP", yearPassed),
-                        new OracleParameter("INST", instName),
+                        new OracleParameter("INST", !string.IsNullOrWhiteSpace(instName) ? (object)instName : DBNull.Value),
                         new OracleParameter("COLL", college),
                         new OracleParameter("SPEC", specName),
                         new OracleParameter("CGPA", finalScore),

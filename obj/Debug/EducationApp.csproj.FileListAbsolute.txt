@@ -5,4 +5,3 @@ E:\Education_Details\obj\Debug\EducationApp.pdb
 e:\Education_Details\obj\Debug\EducationApp.csproj.AssemblyReference.cache
 e:\Education_Details\obj\Debug\EducationApp.csproj.CoreCompileInputs.cache
 e:\Education_Details\obj\Debug\Educatio.F092171D.Up2Date
-e:\Education_Details\bin\EducationApp.dll.config

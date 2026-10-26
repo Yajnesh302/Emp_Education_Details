@@ -461,7 +461,7 @@
                                     <asp:TemplateField HeaderText="Institute / University">
                                         <ItemTemplate>
                                             <div class="font-weight-bold small">
-                                                <%# Eval("INSTITUTE_NAME") %>
+                                                <%# RenderUniversity(Eval("INSTITUTE_NAME")) %>
                                             </div>
                                             <div class="small text-muted">
                                                 <%# Eval("COLLEGE_NAME") != null && Eval("COLLEGE_NAME").ToString().Contains("Direct Certification") ? "<span class='badge badge-light border text-muted' style='font-size:0.75rem;'><i class='fas fa-certificate text-primary mr-1'></i> Direct Certification</span>" : Eval("COLLEGE_NAME") %>

@@ -24,7 +24,7 @@ DECLARE
     v_main_name  VARCHAR2(200) := 'OTHER';
     v_sub_name   VARCHAR2(200) := 'General';
     v_spec       VARCHAR2(200) := 'General';
-    v_inst_name  VARCHAR2(250) := 'Not Specified';
+    v_inst_name  VARCHAR2(250) := NULL;
     v_emp_name   VARCHAR2(150);
     v_desig      VARCHAR2(100);
     v_div        VARCHAR2(100);
@@ -92,10 +92,13 @@ BEGIN
 
     -- 2. Resolve University / Board Name using canonical legacy resolution
     v_inst_name := PKG_EDU_MIGRATION.FN_RESOLVE_LEGACY_UNIV(:NEW.UNIVINSTID, :NEW.COLLEGENAME);
+    IF v_inst_name IS NOT NULL AND TRIM(v_inst_name) IN ('Not Specified', '*', 'None', 'NA', 'N/A', '') THEN
+        v_inst_name := NULL;
+    END IF;
 
-    -- If university is not yet registered in EDU_UNIVERSITY master table,
+    -- If university is valid and not yet registered in EDU_UNIVERSITY master table,
     -- automatically insert it globally so it is available to ALL users across the application
-    IF v_inst_name IS NOT NULL AND TRIM(v_inst_name) NOT IN ('Not Specified', '*', 'None', 'NA', 'N/A', '') THEN
+    IF v_inst_name IS NOT NULL THEN
         DECLARE
             v_univ_cnt NUMBER := 0;
         BEGIN

@@ -162,7 +162,8 @@ This means you can run `02_Seed_MasterData.sql` multiple times without duplicati
 Previously, if a university was not in the master list, the application added it only to that specific user's dropdown in-memory for their session. Now, this behavior is permanently fixed across the stack:
 - **During Migration (`03_Migration_Procedure.sql` & C# Migration):**
   1. The legacy `UNIVINSTID` is looked up in the canonical mapping (`FN_RESOLVE_LEGACY_UNIV` in PL/SQL and `GetLegacyUniversityMap()` in C#). All 58 abbreviation aliases (such as VTU ID 168 -> Visvesvaraya Technological University, IGNOU ID 248 -> 89, UPTU ID 8 -> AKTU 284, NITK ID 276 -> 16, etc.) are automatically normalized to their canonical names.
-  2. If an unrecognized university is encountered, it is automatically inserted into `EDU_UNIVERSITY` using `SEQ_EDU_UNIVERSITY.NEXTVAL` with `IS_ACTIVE = 1`. This makes the university immediately and permanently available **globally to all users**.
+  2. Legacy dummy/unspecified entries where university is `*` (legacy `UNIVINSTID = 0` or collegename `*`) are **intentionally kept blank** (`NULL`) rather than auto-selecting "Other Recognized University / Board". The record is forced to `Draft` status so the employee must fill in their valid university before final submission.
+  3. If an unrecognized valid university is encountered, it is automatically inserted into `EDU_UNIVERSITY` using `SEQ_EDU_UNIVERSITY.NEXTVAL` with `IS_ACTIVE = 1`. This makes the university immediately and permanently available **globally to all users**.
 - **During User Profile Entry (`EmployeeEducation.aspx.cs`):**
   When a user saves or edits a record with a custom university name, `DBHelper.EnsureUniversityExists(name)` checks case-insensitively and automatically inserts the institution into `EDU_UNIVERSITY` if not already present. It is never scoped to a single user in-memory anymore.
 

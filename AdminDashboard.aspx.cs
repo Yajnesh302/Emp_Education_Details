@@ -59,6 +59,16 @@ namespace EducationApp
             return "<span class='text-muted'>&mdash;</span>";
         }
 
+        public string RenderUniversity(object univObj)
+        {
+            string u = univObj != null ? univObj.ToString().Trim() : "";
+            if (DBHelper.IsPlaceholderOrInvalid(u))
+            {
+                return "<span class='text-muted' style='color:#94a3b8; font-weight:500;'>&mdash;</span>";
+            }
+            return Server.HtmlEncode(u);
+        }
+
         private void PopulateFilters()
         {
             DataTable dtMain = DBHelper.GetMainQualifications(false);

@@ -44,7 +44,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_EDU_MIGRATION AS
         -- 1. Check known alias / duplicate legacy IDs from legacy HR system
         IF p_univ_id IS NOT NULL THEN
             CASE p_univ_id
-            WHEN 0 THEN RETURN 'Other Recognized University / Board';
+            WHEN 0 THEN RETURN NULL; -- Legacy dummy '*' entry: keep blank, do not auto-select as Other
             WHEN 8 THEN RETURN 'Dr. A.P.J. Abdul Kalam Technical University (AKTU / UPTU), Lucknow';
             WHEN 53 THEN RETURN 'Madurai Kamaraj University (MKU), Madurai';
             WHEN 59 THEN RETURN 'Jawaharlal Nehru University (JNU), New Delhi';
@@ -164,7 +164,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_EDU_MIGRATION AS
             RETURN TRIM(p_collegename);
         END IF;
 
-        RETURN 'Not Specified';
+        RETURN NULL;
     END FN_RESOLVE_LEGACY_UNIV;
 
     FUNCTION FN_NORMALIZE_GRADE(p_grade IN VARCHAR2) RETURN VARCHAR2 IS
@@ -258,6 +258,16 @@ CREATE OR REPLACE PACKAGE BODY PKG_EDU_MIGRATION AS
         VALUES (v_log_id, SYSDATE, p_executed_by, 'IN_PROGRESS', 'Migration started by ' || p_executed_by);
         COMMIT;
 
+        -- Ensure INSTITUTE_NAME and GRADE_DIVISION are nullable in EDU_EMP_EDUCATION
+        BEGIN
+            EXECUTE IMMEDIATE 'ALTER TABLE EDU_EMP_EDUCATION MODIFY (INSTITUTE_NAME NULL)';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+        BEGIN
+            EXECUTE IMMEDIATE 'ALTER TABLE EDU_EMP_EDUCATION MODIFY (GRADE_DIVISION NULL)';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+
         -- Open cursor on legacy table (defaults to HR_EMP_EDUCATION or accepts BACKUP_HR_EMP_EDUCATION)
         OPEN c_old_data FOR 
             'SELECT PCNO, CTREDN, QFNID, UNIVINSTID, COLLEGENAME, SUBJECTID, YEARPASSED, GRADE, PERCENTAGE, HIGHESTQFN FROM ' || v_source_tbl;
@@ -338,10 +348,13 @@ CREATE OR REPLACE PACKAGE BODY PKG_EDU_MIGRATION AS
 
                     -- 2. Resolve University / Institute Name using comprehensive legacy catalog & aliases
                     v_inst_name := FN_RESOLVE_LEGACY_UNIV(v_univinstid, v_collegename);
+                    IF v_inst_name IS NOT NULL AND TRIM(v_inst_name) IN ('Not Specified', '*', 'None', 'NA', 'N/A', '') THEN
+                        v_inst_name := NULL;
+                    END IF;
 
-                    -- If university is not yet registered in EDU_UNIVERSITY master table,
+                    -- If university is valid and not yet registered in EDU_UNIVERSITY master table,
                     -- automatically insert it globally so it is available to ALL users across the application
-                    IF v_inst_name IS NOT NULL AND TRIM(v_inst_name) NOT IN ('Not Specified', '*', 'None', 'NA', 'N/A', '') THEN
+                    IF v_inst_name IS NOT NULL THEN
                         DECLARE
                             v_univ_cnt NUMBER := 0;
                         BEGIN
@@ -425,8 +438,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_EDU_MIGRATION AS
 
                 -- 5. Status Determination:
                 -- If record contains placeholder values like '*', or missing/invalid grade, force to Draft so employee must correct it
-                IF TRIM(v_collegename) = '*' OR TRIM(v_inst_name) = '*' OR TRIM(v_inst_name) = 'Not Specified' 
-                   OR TRIM(v_spec) = '*' OR v_grade_norm IS NULL 
+                IF v_inst_name IS NULL OR TRIM(v_inst_name) = '*' OR TRIM(v_inst_name) = 'Not Specified'
+                   OR TRIM(v_collegename) = '*' OR TRIM(v_spec) = '*' OR v_grade_norm IS NULL 
                    OR TRIM(NVL(v_percentage, '*')) = '*' OR UPPER(TRIM(v_percentage)) IN ('N/A', 'NA', '-', '--', '?', 'NOT SPECIFIED', 'NONE', 'NULL')
                    OR v_yearpassed IS NULL OR v_yearpassed = 0 THEN
                     v_row_status := 'Draft';
