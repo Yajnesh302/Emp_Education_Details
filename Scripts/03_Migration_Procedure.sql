@@ -118,52 +118,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_EDU_MIGRATION AS
                     NULL;
             END;
         END IF;
-
-        -- 3. Harmonize from Collegename if university ID was not provided or not mapped
-        IF p_collegename IS NOT NULL AND TRIM(p_collegename) NOT IN ('*', 'Not Specified', 'None', 'NA', 'N/A', '') THEN
-            IF UPPER(TRIM(p_collegename)) = 'VTU' OR UPPER(p_collegename) LIKE '%VISVESVARAYA TECHNOLOGICAL%' OR UPPER(p_collegename) LIKE '%VISWESWARAIAH%' THEN
-                RETURN 'Visvesvaraya Technological University (VTU), Belagavi';
-            ELSIF UPPER(TRIM(p_collegename)) = 'IISC' OR UPPER(p_collegename) LIKE '%INDIAN INSTITUTE OF SCIENCE%' THEN
-                RETURN 'Indian Institute of Science (IISc), Bangalore';
-            ELSIF UPPER(TRIM(p_collegename)) = 'JNTU' OR UPPER(p_collegename) LIKE 'JAWAHARLAL NEHRU TECHNOLOGICAL%' THEN
-                RETURN 'Jawaharlal Nehru Technological University (JNTU), Hyderabad';
-            ELSIF UPPER(TRIM(p_collegename)) = 'IGNOU' OR UPPER(p_collegename) LIKE '%INDIRA GANDHI NATIONAL OPEN%' THEN
-                RETURN 'Indira Gandhi National Open University (IGNOU), New Delhi';
-            ELSIF UPPER(TRIM(p_collegename)) IN ('CBSE', 'CBSE BOARD', 'CBSE BOARD NEW DELHI') THEN
-                RETURN 'Central Board of Secondary Education (CBSE), New Delhi';
-            ELSIF UPPER(TRIM(p_collegename)) IN ('ICSE', 'ISC', 'ICSE BOARD', 'ISCE BOARD', 'ICSE / ISC BOARD') THEN
-                RETURN 'Council for the Indian School Certificate Examinations (CISCE / ICSE / ISC)';
-            ELSIF UPPER(TRIM(p_collegename)) IN ('PUE', 'PRE UNIVERSITY BOARD') THEN
-                RETURN 'Department of Pre-University Education (PUE), Karnataka';
-            ELSIF UPPER(TRIM(p_collegename)) IN ('REC, SURATKAL', 'KREC SURATHKAL', 'NIT, SURATHKAL', 'NIT SURATHKAL') THEN
-                RETURN 'National Institute of Technology Karnataka (NITK / REC), Surathkal';
-            ELSIF UPPER(TRIM(p_collegename)) IN ('REC, WARANGAL', 'NIT, WARANGAL') THEN
-                RETURN 'National Institute of Technology (NIT / REC), Warangal';
-            ELSIF UPPER(TRIM(p_collegename)) IN ('REC, TIRUCHY', 'NIT TRICHY') THEN
-                RETURN 'National Institute of Technology (NIT / REC), Tiruchirappalli';
-            ELSIF UPPER(TRIM(p_collegename)) IN ('JNU,DELHI', 'JNU') THEN
-                RETURN 'Jawaharlal Nehru University (JNU), New Delhi';
-            ELSIF UPPER(TRIM(p_collegename)) = 'ANNA UNIVERSITY' THEN
-                RETURN 'Anna University, Chennai';
-            ELSIF UPPER(TRIM(p_collegename)) = 'BANGALORE UNIVERSITY' THEN
-                RETURN 'Bangalore University, Bengaluru';
-            END IF;
-
-            -- Check if collegename directly matches an existing university in EDU_UNIVERSITY
-            BEGIN
-                SELECT UNIV_NAME INTO v_name
-                FROM EDU_UNIVERSITY
-                WHERE UPPER(TRIM(UNIV_NAME)) = UPPER(TRIM(p_collegename))
-                  AND ROWNUM = 1;
-                RETURN v_name;
-            EXCEPTION
-                WHEN NO_DATA_FOUND THEN
-                    NULL;
-            END;
-
-            RETURN TRIM(p_collegename);
-        END IF;
-
+        -- If university ID is not mentioned, '*', or not found in list:
+        -- Do NOT fall back to collegename. Leave it blank (NULL).
         RETURN NULL;
     END FN_RESOLVE_LEGACY_UNIV;
 
@@ -347,13 +303,13 @@ CREATE OR REPLACE PACKAGE BODY PKG_EDU_MIGRATION AS
                     END;
 
                     -- 2. Resolve University / Institute Name using comprehensive legacy catalog & aliases
-                    v_inst_name := FN_RESOLVE_LEGACY_UNIV(v_univinstid, v_collegename);
+                    -- Do NOT pass collegename as university
+                    v_inst_name := FN_RESOLVE_LEGACY_UNIV(v_univinstid, NULL);
                     IF v_inst_name IS NOT NULL AND TRIM(v_inst_name) IN ('Not Specified', '*', 'None', 'NA', 'N/A', '') THEN
                         v_inst_name := NULL;
                     END IF;
 
-                    -- If university is valid and not yet registered in EDU_UNIVERSITY master table,
-                    -- automatically insert it globally so it is available to ALL users across the application
+                    -- If university is not in the master list, it should NOT add a new data while migration; leave it blank (NULL)
                     IF v_inst_name IS NOT NULL THEN
                         DECLARE
                             v_univ_cnt NUMBER := 0;
@@ -363,12 +319,11 @@ CREATE OR REPLACE PACKAGE BODY PKG_EDU_MIGRATION AS
                             WHERE UPPER(TRIM(UNIV_NAME)) = UPPER(TRIM(v_inst_name));
 
                             IF v_univ_cnt = 0 THEN
-                                INSERT INTO EDU_UNIVERSITY (UNIV_ID, UNIV_NAME, STATE_OR_TYPE, IS_ACTIVE)
-                                VALUES (SEQ_EDU_UNIVERSITY.NEXTVAL, TRIM(v_inst_name), 'Recognized University / Board', 1);
+                                v_inst_name := NULL;
                             END IF;
                         EXCEPTION
                             WHEN OTHERS THEN
-                                NULL;
+                                v_inst_name := NULL;
                         END;
                     END IF;
 

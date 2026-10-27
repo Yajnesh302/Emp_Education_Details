@@ -347,45 +347,6 @@ namespace EducationApp.Utils
                             ExecuteSql(conn, "CREATE SEQUENCE SEQ_EDU_AUDIT START WITH 1 INCREMENT BY 1 NOCACHE");
                         }
 
-                        // 10. Check HR_EMP_EDUCATION (Legacy table) - create mock table if not present for development/migration demo
-                        if (!TableExists(conn, "HR_EMP_EDUCATION"))
-                        {
-                            ExecuteSql(conn, @"
-                                CREATE TABLE HR_EMP_EDUCATION (
-                                    PCNO VARCHAR2(30) NOT NULL,
-                                    CTREDN NUMBER NOT NULL,
-                                    QFNID NUMBER NOT NULL,
-                                    UNIVINSTID NUMBER,
-                                    COLLEGENAME VARCHAR2(250),
-                                    SUBJECTID NUMBER,
-                                    YEARPASSED NUMBER(4),
-                                    GRADE VARCHAR2(50),
-                                    PERCENTAGE VARCHAR2(50),
-                                    HIGHESTQFN VARCHAR2(10),
-                                    CONSTRAINT PK_HR_EMP_EDUCATION PRIMARY KEY (PCNO, CTREDN)
-                                )");
-                            SeedSampleLegacyEducation(conn);
-                        }
-
-                        // 11. Check EMPDETAILS mock table for development if neither EMPDETAILS nor HRDATA.EMPDETAILS exists
-                        if (!TableExists(conn, "EMPDETAILS") && !TableExists(conn, "HRDATA.EMPDETAILS"))
-                        {
-                            try
-                            {
-                                ExecuteSql(conn, @"
-                                    CREATE TABLE EMPDETAILS (
-                                        PCNO VARCHAR2(30) NOT NULL,
-                                        NAME VARCHAR2(100),
-                                        DESIGNATION VARCHAR2(100),
-                                        DIVNAME VARCHAR2(100),
-                                        CONSTRAINT PK_EMPDETAILS PRIMARY KEY (PCNO)
-                                    )");
-                                ExecuteSql(conn, "INSERT INTO EMPDETAILS (PCNO, NAME, DESIGNATION, DIVNAME) VALUES ('1001', 'System Administrator', 'Administrator', 'IT-ADMIN')");
-                                ExecuteSql(conn, "INSERT INTO EMPDETAILS (PCNO, NAME, DESIGNATION, DIVNAME) VALUES ('1002', 'Ramesh Kumar', 'Senior Engineer', 'AERODYNAMICS')");
-                                ExecuteSql(conn, "INSERT INTO EMPDETAILS (PCNO, NAME, DESIGNATION, DIVNAME) VALUES ('1003', 'Priya Sharma', 'Scientist C', 'PROPULSION')");
-                            }
-                            catch { }
-                        }
 
                         // 12. Ensure Sub Qualifications are mapped to Main Qualifications
                         EnsureSubQualificationsLinked(conn);
@@ -473,30 +434,71 @@ namespace EducationApp.Utils
                             }
                             catch { }
 
-                            // 18. Auto-heal any migrated records where legacy university was '*' or 0 and was incorrectly set to 'Other Recognized University / Board', 'Other', '*', or 'Not Specified'
+                            // 18. Auto-heal any records where legacy university was not mentioned, '*', or was incorrectly populated with the college name
                             try
                             {
                                 string legTable = GetLegacyEducationTableName();
-                                string cleanSql = @"
+
+                                // A. If legacy record had UNIVINSTID = 0, NULL, or '*', or university not mentioned:
+                                // Clear INSTITUTE_NAME (set to NULL) and set STATUS = 'Draft'
+                                string cleanLegacyUnivSql = @"
                                     UPDATE EDU_EMP_EDUCATION e
                                     SET e.INSTITUTE_NAME = NULL, e.STATUS = 'Draft'
                                     WHERE e.IS_MIGRATED = 1
-                                      AND (e.INSTITUTE_NAME = '*' OR e.INSTITUTE_NAME = 'Not Specified' 
-                                           OR e.INSTITUTE_NAME = 'Other Recognized University / Board' 
-                                           OR e.INSTITUTE_NAME = 'Other')
                                       AND EXISTS (
                                           SELECT 1 FROM " + legTable + @" h
                                           WHERE h.PCNO = e.PCNO
                                             AND h.CTREDN = e.OLD_CTREDN
-                                            AND (h.UNIVINSTID = 0 OR h.UNIVINSTID IS NULL OR TRIM(h.COLLEGENAME) = '*')
+                                            AND (h.UNIVINSTID = 0 OR h.UNIVINSTID IS NULL OR TRIM(TO_CHAR(h.UNIVINSTID)) = '*' OR TRIM(h.COLLEGENAME) = '*')
                                       )";
-                                ExecuteSql(conn, cleanSql);
-                            }
-                            catch { }
+                                ExecuteSql(conn, cleanLegacyUnivSql);
 
-                            try
-                            {
-                                ExecuteSql(conn, "UPDATE EDU_EMP_EDUCATION SET INSTITUTE_NAME = NULL, STATUS = 'Draft' WHERE TRIM(INSTITUTE_NAME) = '*' OR TRIM(INSTITUTE_NAME) = 'Not Specified'");
+                                // B. Clear any record where INSTITUTE_NAME matches COLLEGE_NAME
+                                // (fixes cases where the college name was mistakenly listed in the university column)
+                                string cleanSameCollSql = @"
+                                    UPDATE EDU_EMP_EDUCATION
+                                    SET INSTITUTE_NAME = NULL, STATUS = 'Draft'
+                                    WHERE INSTITUTE_NAME IS NOT NULL
+                                      AND COLLEGE_NAME IS NOT NULL
+                                      AND UPPER(TRIM(INSTITUTE_NAME)) = UPPER(TRIM(COLLEGE_NAME))";
+                                ExecuteSql(conn, cleanSameCollSql);
+
+                                // C. Clear any record where INSTITUTE_NAME matches an entry in EDU_COLLEGE
+                                string cleanCollegeMatchSql = @"
+                                    UPDATE EDU_EMP_EDUCATION e
+                                    SET e.INSTITUTE_NAME = NULL, e.STATUS = 'Draft'
+                                    WHERE e.INSTITUTE_NAME IS NOT NULL
+                                      AND EXISTS (
+                                          SELECT 1 FROM EDU_COLLEGE c
+                                          WHERE UPPER(TRIM(c.COLLEGE_NAME)) = UPPER(TRIM(e.INSTITUTE_NAME))
+                                      )
+                                      AND NOT EXISTS (
+                                          SELECT 1 FROM EDU_UNIVERSITY u
+                                          WHERE UPPER(TRIM(u.UNIV_NAME)) = UPPER(TRIM(e.INSTITUTE_NAME))
+                                            AND u.UNIV_ID < 1000
+                                      )";
+                                ExecuteSql(conn, cleanCollegeMatchSql);
+
+                                // D. Remove any college names that were mistakenly inserted into EDU_UNIVERSITY (UNIV_ID >= 1000)
+                                string deleteCollegeFromUnivSql = @"
+                                    DELETE FROM EDU_UNIVERSITY u
+                                    WHERE u.UNIV_ID >= 1000
+                                      AND EXISTS (
+                                          SELECT 1 FROM EDU_COLLEGE c
+                                          WHERE UPPER(TRIM(c.COLLEGE_NAME)) = UPPER(TRIM(u.UNIV_NAME))
+                                      )";
+                                ExecuteSql(conn, deleteCollegeFromUnivSql);
+
+                                // E. Clear any placeholders like '*', '-', 'Not Specified', 'NA', 'None' in INSTITUTE_NAME
+                                ExecuteSql(conn, @"
+                                    UPDATE EDU_EMP_EDUCATION 
+                                    SET INSTITUTE_NAME = NULL, STATUS = 'Draft' 
+                                    WHERE INSTITUTE_NAME IS NOT NULL 
+                                      AND TRIM(INSTITUTE_NAME) IN ('*', '**', '***', '-', '--', 'NA', 'N/A', 'None', 'Not Specified', 'UNKNOWN', 'NULL', 'Other Recognized University / Board', 'Other')");
+
+                                // F. Standardize VTU naming across EDU_UNIVERSITY and EDU_EMP_EDUCATION
+                                ExecuteSql(conn, "UPDATE EDU_UNIVERSITY SET UNIV_NAME = 'Visvesvaraya Technological University (VTU), Belagavi' WHERE UNIV_ID = 129 AND UNIV_NAME LIKE '%Belgaum%'");
+                                ExecuteSql(conn, "UPDATE EDU_EMP_EDUCATION SET INSTITUTE_NAME = 'Visvesvaraya Technological University (VTU), Belagavi' WHERE INSTITUTE_NAME LIKE '%Belgaum%'");
                             }
                             catch { }
                         }
@@ -2095,43 +2097,6 @@ namespace EducationApp.Utils
             }
         }
 
-        private static void SeedSampleLegacyEducation(OracleConnection conn)
-        {
-            // Seed a few sample legacy records in HR_EMP_EDUCATION to test and demo migration
-            string[] legacyData = new string[]
-            {
-                "1002|1|19|166|National High School|93|2010|Distinction|88.5|N",
-                "1002|2|20|167|National PU College|94|2012|First Class|84.2|N",
-                "1002|3|2|129|BMS College of Engineering|6|2016|First Class|78.4|Y",
-                "1003|1|19|235|Govt High School|93|2011|First Class|72.0|N",
-                "1003|2|41|1|Govt ITI College|1|2013|First Class|80.5|Y",
-                "2947|1|19|166|St. Joseph High School|93|2008|First Class|76.0|N",
-                "2947|2|26|129|PES Polytechnic|8|2011|Distinction|82.3|Y"
-            };
-
-            foreach (var item in legacyData)
-            {
-                var p = item.Split('|');
-                using (OracleCommand cmd = new OracleCommand(@"
-                    INSERT INTO HR_EMP_EDUCATION 
-                    (PCNO, CTREDN, QFNID, UNIVINSTID, COLLEGENAME, SUBJECTID, YEARPASSED, GRADE, PERCENTAGE, HIGHESTQFN)
-                    VALUES (:PCNO, :CTREDN, :QFNID, :UNIV, :COLL, :SUB, :YR, :GRD, :PCT, :HIGH)", conn))
-                {
-                    cmd.Parameters.Add(new OracleParameter("PCNO", p[0]));
-                    cmd.Parameters.Add(new OracleParameter("CTREDN", Convert.ToInt32(p[1])));
-                    cmd.Parameters.Add(new OracleParameter("QFNID", Convert.ToInt32(p[2])));
-                    cmd.Parameters.Add(new OracleParameter("UNIV", Convert.ToInt32(p[3])));
-                    cmd.Parameters.Add(new OracleParameter("COLL", p[4]));
-                    cmd.Parameters.Add(new OracleParameter("SUB", Convert.ToInt32(p[5])));
-                    cmd.Parameters.Add(new OracleParameter("YR", Convert.ToInt32(p[6])));
-                    cmd.Parameters.Add(new OracleParameter("GRD", p[7]));
-                    cmd.Parameters.Add(new OracleParameter("PCT", p[8]));
-                    cmd.Parameters.Add(new OracleParameter("HIGH", p[9]));
-                    cmd.ExecuteNonQuery();
-                }
-            }
-        }
-
         #endregion
 
         #region User Profile & Role Methods
@@ -3226,16 +3191,21 @@ namespace EducationApp.Utils
         }
 
         
+        /// <summary>
+        /// Validates whether a university exists in the master list (EDU_UNIVERSITY).
+        /// If found, returns the canonical UNIV_NAME from the master list.
+        /// If not in the list, it does NOT add new data to EDU_UNIVERSITY and returns null.
+        /// </summary>
         public static string EnsureUniversityExists(string name, string stateOrType = "Recognized Institution")
         {
             if (string.IsNullOrWhiteSpace(name) || IsPlaceholderOrInvalid(name))
-                return name;
+                return null;
 
             string normalized = NormalizeUniversityName(name.Trim());
 
             try
             {
-                // Check if exists in EDU_UNIVERSITY (case-insensitive)
+                // Check if exists in EDU_UNIVERSITY (case-insensitive with normalized name)
                 string checkSql = "SELECT UNIV_NAME FROM EDU_UNIVERSITY WHERE UPPER(TRIM(UNIV_NAME)) = :N AND ROWNUM = 1";
                 object res = ExecuteScalar(checkSql, new OracleParameter("N", normalized.ToUpper()));
                 if (res != null && res != DBNull.Value && !string.IsNullOrWhiteSpace(res.ToString()))
@@ -3243,13 +3213,26 @@ namespace EducationApp.Utils
                     return res.ToString();
                 }
 
-                // Insert into EDU_UNIVERSITY so it is permanently and globally available for all users
-                AddUniversity(normalized, stateOrType);
-                return normalized;
+                // Check with raw name in case normalized differed from DB entry
+                object resRaw = ExecuteScalar(checkSql, new OracleParameter("N", name.Trim().ToUpper()));
+                if (resRaw != null && resRaw != DBNull.Value && !string.IsNullOrWhiteSpace(resRaw.ToString()))
+                {
+                    return resRaw.ToString();
+                }
+
+                // Known VTU variation fallback (Belagavi vs Belgaum)
+                if (normalized.Contains("Visvesvaraya Technological University") || name.Trim().ToUpper() == "VTU")
+                {
+                    object vtuRes = ExecuteScalar("SELECT UNIV_NAME FROM EDU_UNIVERSITY WHERE UNIV_ID = 129 AND ROWNUM = 1");
+                    if (vtuRes != null && vtuRes != DBNull.Value) return vtuRes.ToString();
+                }
+
+                // If the university is not in the list, do NOT add new data; return null so it is left blank
+                return null;
             }
             catch
             {
-                return normalized;
+                return null;
             }
         }
 
@@ -3650,23 +3633,41 @@ namespace EducationApp.Utils
             return _legacyUnivMap;
         }
 
-        public static string GetCanonicalLegacyUniversity(int uid, string colName)
+        public static string GetCanonicalLegacyUniversity(int uid, string colName = null)
         {
-            // Legacy ID 0 was '*' (dummy placeholder in HR system). It must NOT auto-select as 'Other'; keep blank.
+            // Legacy ID 0 was '*' (dummy placeholder in HR system).
+            // If the university is not mentioned, or '*' is there, or not in the list, leave it blank.
+            // Under NO circumstances should the college name (colName) be returned as the university!
             if (uid > 0)
             {
                 var map = GetLegacyUniversityMap();
-                if (map.ContainsKey(uid))
+                if (map != null && map.ContainsKey(uid))
                 {
-                    return map[uid];
+                    string mappedName = map[uid];
+                    if (!string.IsNullOrWhiteSpace(mappedName) && !IsPlaceholderOrInvalid(mappedName))
+                    {
+                        return mappedName;
+                    }
                 }
+
+                // Also check directly in EDU_UNIVERSITY master table if uid exists as UNIV_ID
+                try
+                {
+                    string checkSql = "SELECT UNIV_NAME FROM EDU_UNIVERSITY WHERE UNIV_ID = :ID AND IS_ACTIVE = 1 AND ROWNUM = 1";
+                    object res = ExecuteScalar(checkSql, new OracleParameter("ID", uid));
+                    if (res != null && res != DBNull.Value && !string.IsNullOrWhiteSpace(res.ToString()))
+                    {
+                        string uName = res.ToString().Trim();
+                        if (!IsPlaceholderOrInvalid(uName))
+                        {
+                            return NormalizeUniversityName(uName);
+                        }
+                    }
+                }
+                catch { }
             }
 
-            if (!string.IsNullOrWhiteSpace(colName) && !IsPlaceholderOrInvalid(colName))
-            {
-                return NormalizeUniversityName(colName);
-            }
-
+            // If university is not in the list, not mentioned, or '*', return empty string (leave it blank)
             return string.Empty;
         }
 
@@ -4030,21 +4031,47 @@ namespace EducationApp.Utils
 
                     string mainName = qualNames.ContainsKey(mainCode) ? qualNames[mainCode] : mainCode;
 
-                    // University resolution using canonical legacy catalog & aliases
+                    // University resolution using canonical legacy catalog & aliases (Do NOT pass or use rawCol/COLLEGENAME)
                     int uid = -1;
                     if (r["UNIVINSTID"] != DBNull.Value)
                     {
                         int.TryParse(r["UNIVINSTID"].ToString(), out uid);
                     }
-                    string rawCol = r["COLLEGENAME"] != DBNull.Value ? r["COLLEGENAME"].ToString() : "";
-                    string instName = GetCanonicalLegacyUniversity(uid, rawCol);
+                    string instName = GetCanonicalLegacyUniversity(uid);
 
-                    // If legacy university was '*' or dummy/unspecified, keep it blank (do NOT auto-select as Other)
+                    // If university is not mentioned, or '*' is there, or not in the list:
+                    // It should NOT add new data to EDU_UNIVERSITY; leave it blank (null)
                     if (!string.IsNullOrWhiteSpace(instName) && !IsPlaceholderOrInvalid(instName))
                     {
                         instName = NormalizeUniversityName(instName);
-                        // Ensure university is registered in EDU_UNIVERSITY master table globally for ALL users
-                        instName = EnsureUniversityExists(instName, "Recognized Institution");
+
+                        // Verify that it exists in the master university list
+                        string matchedUniv = null;
+                        if (univDict.ContainsKey(uid))
+                        {
+                            matchedUniv = univDict[uid];
+                        }
+                        else
+                        {
+                            foreach (var kvp in univDict)
+                            {
+                                if (string.Equals(kvp.Value, instName, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    matchedUniv = kvp.Value;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!string.IsNullOrEmpty(matchedUniv))
+                        {
+                            instName = matchedUniv;
+                        }
+                        else
+                        {
+                            // If the university is not in the list, it should NOT add a new data while migration; leave it blank
+                            instName = null;
+                        }
                     }
                     else
                     {

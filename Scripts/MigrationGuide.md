@@ -156,16 +156,12 @@ This means you can run `02_Seed_MasterData.sql` multiple times without duplicati
 
 ---
 
-### 4.2.1 Global University Auto-Registration & Canonical Resolution
+### 4.2.1 Canonical University Resolution & Master Data Integrity
 
-**How Missing Universities are Handled:**
-Previously, if a university was not in the master list, the application added it only to that specific user's dropdown in-memory for their session. Now, this behavior is permanently fixed across the stack:
-- **During Migration (`03_Migration_Procedure.sql` & C# Migration):**
-  1. The legacy `UNIVINSTID` is looked up in the canonical mapping (`FN_RESOLVE_LEGACY_UNIV` in PL/SQL and `GetLegacyUniversityMap()` in C#). All 58 abbreviation aliases (such as VTU ID 168 -> Visvesvaraya Technological University, IGNOU ID 248 -> 89, UPTU ID 8 -> AKTU 284, NITK ID 276 -> 16, etc.) are automatically normalized to their canonical names.
-  2. Legacy dummy/unspecified entries where university is `*` (legacy `UNIVINSTID = 0` or collegename `*`) are **intentionally kept blank** (`NULL`) rather than auto-selecting "Other Recognized University / Board". The record is forced to `Draft` status so the employee must fill in their valid university before final submission.
-  3. If an unrecognized valid university is encountered, it is automatically inserted into `EDU_UNIVERSITY` using `SEQ_EDU_UNIVERSITY.NEXTVAL` with `IS_ACTIVE = 1`. This makes the university immediately and permanently available **globally to all users**.
-- **During User Profile Entry (`EmployeeEducation.aspx.cs`):**
-  When a user saves or edits a record with a custom university name, `DBHelper.EnsureUniversityExists(name)` checks case-insensitively and automatically inserts the institution into `EDU_UNIVERSITY` if not already present. It is never scoped to a single user in-memory anymore.
+**How Missing Universities & Legacy Placeholders are Handled:**
+- **Master Data Protection:** If a university is not in the official list (`EDU_UNIVERSITY`), the application does **NOT** add a new record to the university master table during migration or profile saves. New universities can only be added officially by Administrators via Admin Master Data.
+- **No College Name Fallback:** The legacy `COLLEGENAME` is never used to populate the university column (`INSTITUTE_NAME`). The university column is reserved strictly for University / Board.
+- **Blank for Missing or Placeholder Entries:** If the university is not mentioned, is `*` (e.g. legacy `UNIVINSTID = 0`), or is not in the university master list, the university column is left **blank** (`NULL`). The record's status is set to `Draft` so the employee/administrator can select the valid university before final submission.
 
 
 ### 4.3 `03_Migration_Procedure.sql` — Importing Old HR Data

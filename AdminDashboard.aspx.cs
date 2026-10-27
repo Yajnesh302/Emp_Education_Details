@@ -136,10 +136,10 @@ namespace EducationApp
                 int endRow = Math.Min((gvAdminEducation.PageIndex + 1) * pageSize, totalRecords);
                 int totalPages = (int)Math.Ceiling((double)totalRecords / pageSize);
                 int currentPage = gvAdminEducation.PageIndex + 1;
-                litPagingSummary.Text = $"Showing {startRow:N0} - {endRow:N0} of {totalRecords:N0} (Page {currentPage} of {totalPages})";
+                litPagingSummary.Text = string.Format("Showing {0:N0} - {1:N0} of {2:N0} (Page {3} of {4})", startRow, endRow, totalRecords, currentPage, totalPages);
 
                 // Update Top Paging Controls
-                litTopPageIndicator.Text = $"Page {currentPage} of {Math.Max(1, totalPages)}";
+                litTopPageIndicator.Text = string.Format("Page {0} of {1}", currentPage, Math.Max(1, totalPages));
                 bool hasPrev = gvAdminEducation.PageIndex > 0;
                 bool hasNext = gvAdminEducation.PageIndex < totalPages - 1;
 
@@ -623,14 +623,20 @@ namespace EducationApp
 
             if (!DBHelper.IsPlaceholderOrInvalid(inst))
             {
+                string canonical = DBHelper.EnsureUniversityExists(inst);
+                if (!string.IsNullOrEmpty(canonical))
+                {
+                    inst = canonical;
+                }
+
                 if (ddlUniversity.Items.FindByValue(inst) != null)
                 {
                     ddlUniversity.SelectedValue = inst;
                 }
-                else if (ddlUniversity.Items.Count > 0)
+                else
                 {
-                    ddlUniversity.Items.Insert(1, new ListItem(inst, inst));
-                    ddlUniversity.SelectedValue = inst;
+                    // If the university is not in the list, leave it blank (do NOT add a new item)
+                    ddlUniversity.SelectedIndex = 0;
                 }
             }
             else
@@ -931,6 +937,15 @@ namespace EducationApp
             int year = Convert.ToInt32(ddlYearPassed.SelectedValue);
             string spec = txtSpecialization.Text.Trim();
             string inst = ddlUniversity.SelectedValue;
+            if (string.IsNullOrEmpty(inst) || DBHelper.IsPlaceholderOrInvalid(inst))
+            {
+                inst = null;
+            }
+            else
+            {
+                string canonical = DBHelper.EnsureUniversityExists(inst);
+                inst = !string.IsNullOrEmpty(canonical) ? canonical : inst;
+            }
             bool isHighest = chkIsHighest.Checked;
             string remarks = txtRemarks.Text.Trim();
             string status = ddlRecordStatus.SelectedValue;

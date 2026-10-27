@@ -90,14 +90,13 @@ BEGIN
             v_main_name := v_main_code;
     END;
 
-    -- 2. Resolve University / Board Name using canonical legacy resolution
-    v_inst_name := PKG_EDU_MIGRATION.FN_RESOLVE_LEGACY_UNIV(:NEW.UNIVINSTID, :NEW.COLLEGENAME);
+    -- 2. Resolve University / Board Name using canonical legacy resolution (Do NOT pass collegename)
+    v_inst_name := PKG_EDU_MIGRATION.FN_RESOLVE_LEGACY_UNIV(:NEW.UNIVINSTID, NULL);
     IF v_inst_name IS NOT NULL AND TRIM(v_inst_name) IN ('Not Specified', '*', 'None', 'NA', 'N/A', '') THEN
         v_inst_name := NULL;
     END IF;
 
-    -- If university is valid and not yet registered in EDU_UNIVERSITY master table,
-    -- automatically insert it globally so it is available to ALL users across the application
+    -- If university is not in the master list, it should NOT add a new data; leave it blank (NULL)
     IF v_inst_name IS NOT NULL THEN
         DECLARE
             v_univ_cnt NUMBER := 0;
@@ -107,12 +106,11 @@ BEGIN
             WHERE UPPER(TRIM(UNIV_NAME)) = UPPER(TRIM(v_inst_name));
 
             IF v_univ_cnt = 0 THEN
-                INSERT INTO EDU_UNIVERSITY (UNIV_ID, UNIV_NAME, STATE_OR_TYPE, IS_ACTIVE)
-                VALUES (SEQ_EDU_UNIVERSITY.NEXTVAL, TRIM(v_inst_name), 'Recognized University / Board', 1);
+                v_inst_name := NULL;
             END IF;
         EXCEPTION
             WHEN OTHERS THEN
-                NULL;
+                v_inst_name := NULL;
         END;
     END IF;
 

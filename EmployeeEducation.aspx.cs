@@ -631,8 +631,11 @@ namespace EducationApp
 
                 if (!DBHelper.IsPlaceholderOrInvalid(inst))
                 {
-                    // Ensure the university exists in master database (EDU_UNIVERSITY) globally for all users
-                    inst = DBHelper.EnsureUniversityExists(inst);
+                    string canonical = DBHelper.EnsureUniversityExists(inst);
+                    if (!string.IsNullOrEmpty(canonical))
+                    {
+                        inst = canonical;
+                    }
 
                     if (ddlUniversity.Items.FindByValue(inst) != null)
                     {
@@ -640,8 +643,8 @@ namespace EducationApp
                     }
                     else
                     {
-                        ddlUniversity.Items.Insert(1, new ListItem(inst, inst));
-                        ddlUniversity.SelectedValue = inst;
+                        // If the university is not in the list, leave it blank (do NOT add a new item)
+                        ddlUniversity.SelectedIndex = 0;
                     }
                 }
                 else
@@ -984,7 +987,12 @@ namespace EducationApp
             string inst = ddlUniversity.SelectedValue;
             if (!string.IsNullOrEmpty(inst) && !DBHelper.IsPlaceholderOrInvalid(inst))
             {
-                inst = DBHelper.EnsureUniversityExists(inst);
+                string canonical = DBHelper.EnsureUniversityExists(inst);
+                inst = !string.IsNullOrEmpty(canonical) ? canonical : inst;
+            }
+            else
+            {
+                inst = null;
             }
             bool isHighest = chkIsHighest.Checked;
             string remarks = txtRemarks.Text.Trim();
